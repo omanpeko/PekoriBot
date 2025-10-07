@@ -27,7 +27,47 @@ main_color = discord.Color.from_rgb(255, 140, 0)
 # ---- GAS Webhook ----
 GAS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbztYZmisYPC_BbyY-lNG296sIQHZBo_iu1xMcf8M_5_QJX7DGUNcz5Z2HP2gWgW-RvvEg/exec"
 
-# ---- チーム分け関数 ----
+
+# ---- ランク表記変換 ----
+def normalize_rank(input_rank: str) -> str:
+    text = input_rank.strip().lower()
+    text = text.replace("　", "").replace(" ", "")
+
+    table = {
+        "iron": "アイアン", "あいあん": "アイアン",
+        "bronze": "ブロンズ", "ぶろ": "ブロンズ", "ブロ": "ブロンズ",
+        "silver": "シルバー", "しる": "シルバー", "シル": "シルバー",
+        "gold": "ゴールド", "ごる": "ゴールド", "ゴル": "ゴールド",
+        "platinum": "プラチナ", "plat": "プラチナ", "ぷら": "プラチナ", "プラ": "プラチナ",
+        "diamond": "ダイヤ", "dia": "ダイヤ", "だいや": "ダイヤ", "ダイヤ": "ダイヤ",
+        "ascendant": "アセンダント", "ase": "アセンダント", "あせ": "アセンダント", "汗": "アセンダント", "アセ": "アセンダント",
+        "immortal": "イモータル", "imo": "イモータル", "芋": "イモータル", "いも": "イモータル", "イモ": "イモータル",
+        "radiant": "レディアント", "れでぃ": "レディアント", "レディ": "レディアント",
+    }
+
+    num_map = {
+        "1": "1", "１": "1",
+        "2": "2", "２": "2",
+        "3": "3", "３": "3",
+    }
+
+    num = "1"
+    for k, v in num_map.items():
+        if text.endswith(k):
+            num = v
+            text = text[:-len(k)]
+            break
+
+    rank_name = next((v for k, v in table.items() if k in text), None)
+    if not rank_name:
+        return input_rank  # 不明ならそのまま返す
+
+    if rank_name == "レディアント":
+        return rank_name
+    return f"{rank_name}{num}"
+
+
+# ---- チーム分けアルゴリズム ----
 def split_balanced_teams(players):
     n = len(players)
     best_diff = 999
@@ -46,26 +86,28 @@ def split_balanced_teams(players):
     return best_pair[0], best_pair[1], best_diff
 
 
-# ---- グループ定義 ----
+# ---- /peko グループ ----
 peko = SlashCommandGroup("peko", "PekoriBotのコマンド群", guild_ids=GUILD_IDS)
 
 
 # ===========================
 # 🟧 /peko rank
 # ===========================
-@peko.command(name="rank", description="自分のランクを登録します（例：ゴールド2 / gold2 / plat3 / ase1 / ダイヤ3 など）")
+@peko.command(name="rank", description="自分のランクを登録します（例：ゴールド2 / gold2 / ダイヤ3 / ase1 など）")
 async def rank(ctx, rank: str):
     user = ctx.author
     user_id = str(user.id)
     username = user.display_name
     avatar_url = user.display_avatar.url
 
+    matched_rank = normalize_rank(rank)
+
     payload = {
         "action": "add",
         "user_id": user_id,
         "username": username,
         "avatar_url": avatar_url,
-        "rank": rank
+        "rank": matched_rank
     }
 
     await ctx.defer()
@@ -74,9 +116,9 @@ async def rank(ctx, rank: str):
             text = await resp.text()
 
     if "ADDED" in text:
-        await ctx.respond(f"✅ {username} さんを登録しました！")
+        await ctx.respond(f"✅ {username} さんを **{matched_rank}** で登録しました！")
     elif "UPDATED" in text:
-        await ctx.respond(f"🔁 {username} さんのランクを更新しました！")
+        await ctx.respond(f"🔁 {username} さんのランクを **{matched_rank}** に更新しました！")
     else:
         await ctx.respond(f"⚠️ 登録に失敗しました（{text}）")
 
