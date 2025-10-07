@@ -3,10 +3,11 @@ import os
 import logging
 import random
 import itertools
+import re
 import discord
 from discord.ext import commands
 from discord.commands import SlashCommandGroup
-import aiohttp  # GASとの通信
+import aiohttp  # GAS連携
 
 logging.basicConfig(level=logging.INFO)
 
@@ -24,10 +25,10 @@ GUILD_IDS = [1357655899212349490]
 # ---- カラー設定 ----
 main_color = discord.Color.from_rgb(255, 140, 0)  # オレンジ
 
-# ---- Google Apps ScriptのURL ----
+# ---- Google Apps Script URL ----
 GAS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbyjOtoYq8zeOfA-ph9GzdUWJmGONWF0N9UNk6RffHbi6XDki58LEmFzfIZpMWkV6X1hrQ/exec"
 
-# ---- ランクポイントテーブル ----
+# ---- ランクポイント辞書 ----
 RANK_POINTS = {
     "アイアン1": 1, "アイアン2": 2, "アイアン3": 3,
     "ブロンズ1": 4, "ブロンズ2": 5, "ブロンズ3": 6,
@@ -40,29 +41,39 @@ RANK_POINTS = {
     "レディアント": 25
 }
 
-# ---- キャラ名リスト ----
-CHAR_NAMES = [
-    "リオナ", "カレン", "ユウキ", "トウマ", "サララ",
-    "アキトラ", "ミナト", "レイナ", "タカオ", "シズク",
-    "ハルフォ", "アマリス", "カグラミ", "リベルタ", "ノアール",
-    "セレスティ", "ユリウスナ", "ルミナリア", "カナデアス", "アーディン",
-    "シグルディア", "ラファエリア", "フィオレンテ", "グランディア", "アルフォリア",
-    "ミツキオリオン", "アスタルテリア", "フェルナリアン", "クロノディアス", "ヴァレリアーナ"
-]
+# ---- ランク名ゆれ → 正規化テーブル ----
+RANK_NORMALIZE = {
+    # Iron
+    r"^(iron|あいあん|アイアン)": "アイアン",
+    # Bronze
+    r"^(bronze|ぶろんず|ブロンズ)": "ブロンズ",
+    # Silver
+    r"^(silver|しるば|シルバー)": "シルバー",
+    # Gold
+    r"^(gold|ごーるど|ゴールド)": "ゴールド",
+    # Platinum
+    r"^(plat|platinum|ぷらちな|プラチナ)": "プラチナ",
+    # Diamond
+    r"^(dia|diamond|だいや|ダイヤ)": "ダイヤ",
+    # Ascendant
+    r"^(ase|ascendant|あせ|アセンダント)": "アセンダント",
+    # Immortal
+    r"^(imm|immortal|いも|イモータル)": "イモータル",
+    # Radiant
+    r"^(rad|radiant|れでぃ|レディアント)": "レディアント",
+}
 
-# ---- チーム分けアルゴリズム ----
+# ---- チーム分けアルゴリズム（前と同じ）----
 def generate_balanced_teams(players):
     valid_combinations = []
     all_combos = list(itertools.combinations(range(10), 5))
     seen = set()
-
     for combo in all_combos:
         complement = tuple(sorted(set(range(10)) - set(combo)))
         key = tuple(sorted(combo))
         if key in seen or complement in seen:
             continue
         seen.add(key)
-
         teamA = [players[i] for i in combo]
         teamB = [players[i] for i in range(10) if i not in combo]
         sumA = sum(p[2] for p in teamA)
@@ -70,10 +81,8 @@ def generate_balanced_teams(players):
         diff = abs(sumA - sumB)
         if diff <= 1:
             valid_combinations.append((teamA, teamB, diff))
-
     if not valid_combinations:
         return None, None, None, 0, 0
-
     total = len(valid_combinations)
     selected_index = random.randint(0, total - 1)
     teamA, teamB, diff = valid_combinations[selected_index]
@@ -84,66 +93,45 @@ def generate_balanced_teams(players):
 peko = SlashCommandGroup("peko", "PekoriBotのコマンド群", guild_ids=GUILD_IDS)
 
 
-# 🎮 チーム分け
-@peko.command(name="teamtest", description="キャラ名でチーム分けをテスト")
-async def teamtest(ctx):
-    await ctx.defer()
-
-    ranks = list(RANK_POINTS.keys())
-    players = []
-    names = random.sample(CHAR_NAMES, 10)
-
-    for name in names:
-        rank = random.choice(ranks)
-        point = RANK_POINTS[rank]
-        players.append((name, rank, point))
-
-    teamA, teamB, diff, idx, total = generate_balanced_teams(players)
-    if not teamA:
-        await ctx.respond("⚠️ 条件を満たすチーム分けが見つかりませんでした。")
-        return
-
-    powerA = sum(p[2] for p in teamA)
-    powerB = sum(p[2] for p in teamB)
-
-    embed = discord.Embed(title="チーム分け結果", color=main_color)
-    embed.add_field(name="🟥 アタッカー＿＿＿＿", value="\n".join([f"{p[0]} ({p[1]})" for p in teamA]) + f"\n戦力：{powerA}", inline=True)
-    embed.add_field(name="🟦 ディフェンダー", value="\n".join([f"{p[0]} ({p[1]})" for p in teamB]) + f"\n戦力：{powerB}", inline=True)
-    embed.add_field(name="　", value=f"組み合わせ候補：{idx}/{total}", inline=False)
-
-    await ctx.respond(embed=embed)
-
-
-# 📝 ランク登録（上書き対応）
-@peko.command(name="rank", description="自分のランクを登録します（上書き対応）")
+# 📝 ランク登録コマンド（入力ゆれ対応）
+@peko.command(name="rank", description="自分のランクを登録（全角・英語・略称OK）")
 async def rank(ctx, rank_name: str):
     user = ctx.author
     avatar_url = user.display_avatar.url
     username = user.display_name
     user_id = str(user.id)
 
-    # --- 1. 現在のデータ取得 ---
-    async with aiohttp.ClientSession() as session:
-        async with session.get(GAS_WEBHOOK_URL) as response:
-            existing_data = await response.json()
+    # 入力整形
+    input_text = rank_name.strip().lower().replace("　", "").replace(" ", "")
+    input_text = re.sub(r"(\d+)", lambda m: str(int(m.group(1))), input_text)  # 全角数字→半角数字
 
-    # --- 2. 登録情報をGASに送信 ---
+    # --- ランク正規化 ---
+    matched_rank = None
+    for pattern, base in RANK_NORMALIZE.items():
+        if re.match(pattern, input_text):
+            # 数字がある場合は末尾に追加
+            m = re.search(r"(\d+)", input_text)
+            num = m.group(1) if m else ""
+            matched_rank = f"{base}{num}"
+            break
+
+    # 不明ランク対応
+    if not matched_rank or matched_rank not in RANK_POINTS:
+        await ctx.respond(f"⚠️ `{rank_name}` は認識できませんでした。例：`ゴールド2` / `gold2` / `plat3` など")
+        return
+
+    # --- GASに送信 ---
     payload = {
         "username": username,
         "user_id": user_id,
         "avatar_url": avatar_url,
-        "rank": rank_name
+        "rank": matched_rank
     }
 
     async with aiohttp.ClientSession() as session:
         async with session.post(GAS_WEBHOOK_URL, json=payload) as response:
             if response.status == 200:
-                # --- 上書き or 新規メッセージ判定 ---
-                if existing_data.get("user_id") == user_id:
-                    msg = f"♻️ {username} さんのランクを **{rank_name}** に更新しました！"
-                else:
-                    msg = f"✅ {username} さんのランク **{rank_name}** を登録しました！"
-                await ctx.respond(msg)
+                await ctx.respond(f"✅ {username} さんのランク **{matched_rank}** を登録しました！")
             else:
                 await ctx.respond(f"⚠️ 登録に失敗しました（{response.status}）")
 
@@ -154,7 +142,7 @@ bot.add_application_command(peko)
 # ---- 起動 ----
 @bot.event
 async def on_ready():
-    await bot.change_presence(activity=discord.Game(name="/peko teamtest"))
+    await bot.change_presence(activity=discord.Game(name="/peko rank"))
     logging.info(f"✅ Logged in as {bot.user} (id: {bot.user.id})")
 
 
