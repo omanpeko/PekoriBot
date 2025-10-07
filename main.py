@@ -21,7 +21,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 GUILD_IDS = [1357655899212349490]
 
 # ---- カラー設定 ----
-main_color = discord.Color.from_rgb(126, 126, 126)  # Embed全体の色（グレー）
+main_color = discord.Color.from_rgb(255, 140, 0)  # オレンジ (#FF8C00)
 
 # ---- ランクポイントテーブル ----
 RANK_POINTS = {
@@ -129,9 +129,9 @@ async def teamtest(ctx):
         inline=True
     )
 
-    #  情報フィールド
+    # 情報欄 → 改行代わり（全角スペース）
     embed.add_field(
-        name="　",  # ← 全角スペースのみ
+        name="　",
         value=f"組み合わせ候補：{idx}/{total}",
         inline=False
     )
