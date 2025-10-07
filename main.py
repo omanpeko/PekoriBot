@@ -21,9 +21,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 GUILD_IDS = [1357655899212349490]
 
 # ---- カラー設定 ----
-main_color = discord.Color.from_rgb(126, 126, 126)  # 全体統一（グレー基調）
-atk_color  = discord.Color.from_rgb(255, 110, 110)  # 赤（絵文字枠には未使用）
-def_color  = discord.Color.from_rgb(0, 200, 170)    # 青緑（絵文字枠には未使用）
+main_color = discord.Color.from_rgb(126, 126, 126)  # Embed全体の色（グレー）
 
 # ---- ランクポイントテーブル ----
 RANK_POINTS = {
@@ -50,7 +48,6 @@ RANK_TO_EMOJI = {
     "イモータル1": "Immortal1", "イモータル2": "Immortal2", "イモータル3": "Immortal3",
     "レディアント": "Radiant"
 }
-
 
 # ---- チーム分けアルゴリズム ----
 def generate_balanced_teams(players):
@@ -118,21 +115,23 @@ async def teamtest(ctx):
     powerA = sum(p[2] for p in teamA)
     powerB = sum(p[2] for p in teamB)
 
-    # ---- Embed（1枚で横並び）----
+    # ---- Embed（横並び）----
     embed = discord.Embed(title="チーム分け結果", color=main_color)
 
     embed.add_field(
-        name="🟥 アタッカー",
+        name="🟥 アタッカー　　",  # 全角スペースで右に余白
         value="\n".join([format_player_line(p) for p in teamA]) + f"\n戦力：{powerA}",
         inline=True
     )
     embed.add_field(
-        name="🟩 ディフェンダー",
+        name="🟦 ディフェンダー",
         value="\n".join([format_player_line(p) for p in teamB]) + f"\n戦力：{powerB}",
         inline=True
     )
+
+    #  情報フィールド
     embed.add_field(
-        name="💡 情報",
+        name="　",  # ← 全角スペースのみ
         value=f"組み合わせ候補：{idx}/{total}",
         inline=False
     )
