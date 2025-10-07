@@ -5,7 +5,7 @@ import random
 import itertools
 import discord
 from discord.ext import commands
-from discord.commands import slash_command
+from discord.commands import SlashCommandGroup
 
 logging.basicConfig(level=logging.INFO)
 
@@ -67,17 +67,15 @@ def generate_balanced_teams(players):
     return teamA, teamB, diff, selected_index + 1, total
 
 
-# ---- /peko teamtest ----
-@slash_command(
-    name="peko_teamtest",
-    description="ランダム10人でチーム分けをテスト",
-    guild_ids=GUILD_IDS
-)
-async def peko_teamtest(ctx):
+# ---- /peko コマンドグループ ----
+peko = SlashCommandGroup("peko", "PekoriBotのコマンド群", guild_ids=GUILD_IDS)
+
+
+@peko.command(name="teamtest", description="ランダム10人でチーム分けをテスト")
+async def teamtest(ctx):
     """テストモード：ランダム10人生成してチーム分け"""
     await ctx.defer()
 
-    # ランダム10人とランクポイント生成
     ranks = list(RANK_POINTS.keys())
     players = []
     for i in range(10):
@@ -92,23 +90,22 @@ async def peko_teamtest(ctx):
         await ctx.respond("⚠️ 条件を満たすチーム分けが見つかりませんでした。")
         return
 
-    # Embed出力
     embed = discord.Embed(title="チーム分け結果", color=discord.Color.from_rgb(255, 140, 0))
-
-    attacker_names = "\n".join([p[0] for p in teamA])
-    defender_names = "\n".join([p[0] for p in teamB])
-
-    embed.add_field(name="アタッカー", value=attacker_names, inline=True)
-    embed.add_field(name="ディフェンダー", value=defender_names, inline=True)
+    embed.add_field(name="アタッカー", value="\n".join([p[0] for p in teamA]), inline=True)
+    embed.add_field(name="ディフェンダー", value="\n".join([p[0] for p in teamB]), inline=True)
     embed.add_field(name="　", value=f"組み合わせ候補：{idx}/{total}", inline=False)
 
     await ctx.respond(embed=embed)
 
 
+# Botにコマンドグループ登録
+bot.add_application_command(peko)
+
+
 # ---- 起動 ----
 @bot.event
 async def on_ready():
-    await bot.change_presence(activity=discord.Game(name="/peko_teamtest"))
+    await bot.change_presence(activity=discord.Game(name="/peko teamtest"))
     logging.info(f"✅ Logged in as {bot.user} (id: {bot.user.id})")
 
 
