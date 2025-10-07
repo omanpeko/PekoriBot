@@ -69,20 +69,11 @@ def generate_balanced_teams(players):
 
 # ---- /peko teamtest ----
 @slash_command(
-    name="peko",
-    description="PekoriBotコマンド集",
-    guild_ids=GUILD_IDS
-)
-async def peko(ctx):
-    pass  # ダミー（コマンドグループとして使う）
-
-
-@peko.subcommand(
-    name="teamtest",
+    name="peko_teamtest",
     description="ランダム10人でチーム分けをテスト",
     guild_ids=GUILD_IDS
 )
-async def teamtest(ctx):
+async def peko_teamtest(ctx):
     """テストモード：ランダム10人生成してチーム分け"""
     await ctx.defer()
 
@@ -117,7 +108,7 @@ async def teamtest(ctx):
 # ---- 起動 ----
 @bot.event
 async def on_ready():
-    await bot.change_presence(activity=discord.Game(name="/peko teamtest"))
+    await bot.change_presence(activity=discord.Game(name="/peko_teamtest"))
     logging.info(f"✅ Logged in as {bot.user} (id: {bot.user.id})")
 
 
