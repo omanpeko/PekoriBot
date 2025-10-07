@@ -55,11 +55,11 @@ RANK_NORMALIZE = {
 # ---- /peko グループ ----
 peko = SlashCommandGroup("peko", "PekoriBotのコマンド群", guild_ids=GUILD_IDS)
 
+
 # ✅ ランク登録コマンド
 @peko.command(name="rank", description="自分のランクを登録（全角・略称・英語OK）")
 async def rank(ctx, rank_name: str):
     await ctx.defer()
-
     user = ctx.author
     avatar_url = user.display_avatar.url
     username = user.display_name
@@ -85,7 +85,6 @@ async def rank(ctx, rank_name: str):
         )
         return
 
-    # --- GASに送信 ---
     payload = {
         "action": "add",
         "username": username,
@@ -108,6 +107,7 @@ async def rank(ctx, rank_name: str):
             else:
                 await ctx.followup.send(f"⚠️ 登録に失敗しました（{response.status}）")
 
+
 # 🗑️ 登録削除コマンド
 @peko.command(name="remove", description="自分のランク登録データを削除します")
 async def remove(ctx):
@@ -128,13 +128,40 @@ async def remove(ctx):
                 msg = f"⚠️ 削除処理に失敗しました（{response.status}）"
             await ctx.followup.send(msg)
 
-bot.add_application_command(peko)
+
+# ✏️ ニックネーム変更コマンド
+@peko.command(name="rename", description="登録済みのニックネームを変更します")
+async def rename(ctx, new_name: str):
+    await ctx.defer()
+    user = ctx.author
+    user_id = str(user.id)
+
+    payload = {
+        "action": "rename",
+        "user_id": user_id,
+        "new_name": new_name
+    }
+
+    async with aiohttp.ClientSession() as session:
+        async with session.post(GAS_WEBHOOK_URL, json=payload) as response:
+            text = await response.text()
+            if "UPDATED_RENAME" in text:
+                msg = f"✏️ {user.display_name} さんの登録名を **{new_name}** に変更しました。"
+            elif "NOT_FOUND" in text:
+                msg = f"⚠️ 登録データが見つかりませんでした。まず `/peko rank` で登録してください。"
+            else:
+                msg = f"⚠️ 変更に失敗しました（{response.status}）"
+            await ctx.followup.send(msg)
+
 
 # ---- 起動 ----
+bot.add_application_command(peko)
+
 @bot.event
 async def on_ready():
     await bot.change_presence(activity=discord.Game(name="/peko rank"))
     logging.info(f"✅ Logged in as {bot.user} (id: {bot.user.id})")
+
 
 if __name__ == "__main__":
     token = os.getenv("DISCORD_TOKEN", "").strip().strip('"').strip("'")
