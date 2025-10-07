@@ -17,7 +17,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 # 即時反映したいサーバー（ギルド）IDがあれば入れる（複数OK）
 # 例: [932269784228306995, 1131436758970671104]
-GUILD_IDS = []
+GUILD_IDS = [1357655899212349490]
 
 @bot.event
 async def on_ready():
