@@ -22,7 +22,7 @@ GUILD_IDS = [1357655899212349490]
 
 # ---- カラー設定 ----
 atk_color  = discord.Color.from_rgb(255, 110, 110)  # 赤
-def_color  = discord.Color.from_rgb(0, 200, 19W0)    # 青緑
+def_color  = discord.Color.from_rgb(0, 200, 190)    # 青緑
 info_color = discord.Color.from_rgb(126, 126, 126)  # グレー (#7E7E7E)
 
 # ---- ランクポイントテーブル ----
