@@ -15,10 +15,9 @@ intents.message_content = True
 intents.voice_states = True
 intents.members = True
 
-# ---- Bot ----
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# 即時反映サーバー
+# ---- サーバーID ----
 GUILD_IDS = [1357655899212349490]
 
 # ---- カラー設定 ----
@@ -39,13 +38,24 @@ RANK_POINTS = {
     "レディアント": 25
 }
 
+# ---- ランク名 → 絵文字名マッピング ----
+RANK_TO_EMOJI = {
+    "アイアン1": "Iron1", "アイアン2": "Iron2", "アイアン3": "Iron3",
+    "ブロンズ1": "Bronze1", "ブロンズ2": "Bronze2", "ブロンズ3": "Bronze3",
+    "シルバー1": "Silver1", "シルバー2": "Silver2", "シルバー3": "Silver3",
+    "ゴールド1": "Gold1", "ゴールド2": "Gold2", "ゴールド3": "Gold3",
+    "プラチナ1": "Platinum1", "プラチナ2": "Platinum2", "プラチナ3": "Platinum3",
+    "ダイヤ1": "Diamond1", "ダイヤ2": "Diamond2", "ダイヤ3": "Diamond3",
+    "アセンダント1": "Ascendant1", "アセンダント2": "Ascendant2", "アセンダント3": "Ascendant3",
+    "イモータル1": "Immortal1", "イモータル2": "Immortal2", "イモータル3": "Immortal3",
+    "レディアント": "Radiant"
+}
+
+
 # ---- チーム分けアルゴリズム ----
 def generate_balanced_teams(players):
-    """
-    players: [(name, point), ...] 10人分
-    """
     valid_combinations = []
-    all_combos = list(itertools.combinations(range(10), 5))  # 10C5 = 252
+    all_combos = list(itertools.combinations(range(10), 5))
     seen = set()
 
     for combo in all_combos:
@@ -57,8 +67,8 @@ def generate_balanced_teams(players):
 
         teamA = [players[i] for i in combo]
         teamB = [players[i] for i in range(10) if i not in combo]
-        sumA = sum(p[1] for p in teamA)
-        sumB = sum(p[1] for p in teamB)
+        sumA = sum(p[2] for p in teamA)
+        sumB = sum(p[2] for p in teamB)
         diff = abs(sumA - sumB)
         if diff <= 1:
             valid_combinations.append((teamA, teamB, diff))
@@ -78,7 +88,6 @@ peko = SlashCommandGroup("peko", "PekoriBotのコマンド群", guild_ids=GUILD_
 
 @peko.command(name="teamtest", description="ランダム10人でチーム分けをテスト")
 async def teamtest(ctx):
-    """テストモード：ランダム10人生成してチーム分け"""
     await ctx.defer()
 
     ranks = list(RANK_POINTS.keys())
@@ -87,7 +96,7 @@ async def teamtest(ctx):
         name = chr(65 + i)  # A〜J
         rank = random.choice(ranks)
         point = RANK_POINTS[rank]
-        players.append((name, point))
+        players.append((name, rank, point))  # (名前, ランク, ポイント)
 
     teamA, teamB, diff, idx, total = generate_balanced_teams(players)
 
@@ -95,20 +104,28 @@ async def teamtest(ctx):
         await ctx.respond("⚠️ 条件を満たすチーム分けが見つかりませんでした。")
         return
 
+    guild = ctx.guild
+    emoji_dict = {e.name: e for e in guild.emojis}
+
+    def format_player_line(p):
+        name, rank, _ = p
+        emoji_name = RANK_TO_EMOJI.get(rank)
+        emoji = emoji_dict.get(emoji_name)
+        emoji_text = f"{emoji}" if emoji else f":{emoji_name}:"
+        return f"{emoji_text} {name}"
+
     # 各Embed作成
     embed_atk = discord.Embed(title="アタッカー", color=atk_color)
     embed_def = discord.Embed(title="ディフェンダー", color=def_color)
     embed_info = discord.Embed(color=info_color)
 
-    embed_atk.description = "\n".join([p[0] for p in teamA])
-    embed_def.description = "\n".join([p[0] for p in teamB])
+    embed_atk.description = "\n".join([format_player_line(p) for p in teamA])
+    embed_def.description = "\n".join([format_player_line(p) for p in teamB])
     embed_info.description = f"組み合わせ候補：{idx}/{total}"
 
-    # Embed3つで送信
     await ctx.respond(embeds=[embed_atk, embed_def, embed_info])
 
 
-# コマンド登録
 bot.add_application_command(peko)
 
 
