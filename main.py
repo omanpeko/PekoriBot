@@ -22,155 +22,76 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 GUILD_IDS = [1357655899212349490]
 
 # ---- カラー設定 ----
-main_color = discord.Color.from_rgb(255, 140, 0)  # オレンジ
+atk_color  = discord.Color.from_rgb(255, 120, 120)  # 薄い赤
+def_color  = discord.Color.from_rgb(0, 180, 170)    # 青緑
+info_color = discord.Color.from_rgb(126, 126, 126)  # グレー
 
-# ---- GAS Webhook URL ----
+# ---- ランクポイントテーブル ----
+RANK_POINTS = {
+    "アイアン1": 1, "アイアン2": 2, "アイアン3": 3,
+    "ブロンズ1": 4, "ブロンズ2": 5, "ブロンズ3": 6,
+    "シルバー1": 7, "シルバー2": 8, "シルバー3": 9,
+    "ゴールド1": 10, "ゴールド2": 11, "ゴールド3": 12,
+    "プラチナ1": 13, "プラチナ2": 14, "プラチナ3": 15,
+    "ダイヤ1": 16, "ダイヤ2": 17, "ダイヤ3": 18,
+    "アセンダント1": 19, "アセンダント2": 20, "アセンダント3": 21,
+    "イモータル1": 22, "イモータル2": 23, "イモータル3": 24,
+    "レディアント": 25
+}
+
+# ---- ランク名 → 絵文字名マッピング ----
+RANK_TO_EMOJI = {
+    "アイアン1": "Iron1", "アイアン2": "Iron2", "アイアン3": "Iron3",
+    "ブロンズ1": "Bronze1", "ブロンズ2": "Bronze2", "ブロンズ3": "Bronze3",
+    "シルバー1": "Silver1", "シルバー2": "Silver2", "シルバー3": "Silver3",
+    "ゴールド1": "Gold1", "ゴールド2": "Gold2", "ゴールド3": "Gold3",
+    "プラチナ1": "Platinum1", "プラチナ2": "Platinum2", "プラチナ3": "Platinum3",
+    "ダイヤ1": "Diamond1", "ダイヤ2": "Diamond2", "ダイヤ3": "Diamond3",
+    "アセンダント1": "Ascendant1", "アセンダント2": "Ascendant2", "アセンダント3": "Ascendant3",
+    "イモータル1": "Immortal1", "イモータル2": "Immortal2", "イモータル3": "Immortal3",
+    "レディアント": "Radiant"
+}
+
+# ---- GAS URL ----
 GAS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbztYZmisYPC_BbyY-lNG296sIQHZBo_iu1xMcf8M_5_QJX7DGUNcz5Z2HP2gWgW-RvvEg/exec"
 
 
 # ============================================================
-#  ランク表記変換（全角・半角・英語・略称・誤字対応）
+# チーム分けアルゴリズム（戦力差1以内）
 # ============================================================
-def normalize_rank(input_rank: str) -> str | None:
-    text = input_rank.strip().lower()
-    text = text.replace("　", "").replace(" ", "")
+def generate_balanced_teams(players):
+    valid_combinations = []
+    all_combos = list(itertools.combinations(range(len(players)), len(players)//2))
+    seen = set()
 
-    table = {
-        "iron": "アイアン", "あいあん": "アイアン",
-        "bronze": "ブロンズ", "ぶろ": "ブロンズ", "ブロ": "ブロンズ",
-        "silver": "シルバー", "しる": "シルバー", "シル": "シルバー",
-        "gold": "ゴールド", "ごる": "ゴールド", "ゴル": "ゴールド",
-        "platinum": "プラチナ", "plat": "プラチナ", "ぷら": "プラチナ", "プラ": "プラチナ",
-        "diamond": "ダイヤ", "dia": "ダイヤ", "だいや": "ダイヤ", "ダイヤ": "ダイヤ",
-        "ascendant": "アセンダント", "ase": "アセンダント", "あせ": "アセンダント", "汗": "アセンダント", "アセ": "アセンダント",
-        "immortal": "イモータル", "imo": "イモータル", "芋": "イモータル", "いも": "イモータル", "イモ": "イモータル",
-        "radiant": "レディアント", "れでぃ": "レディアント", "レディ": "レディアント",
-    }
+    for combo in all_combos:
+        complement = tuple(sorted(set(range(len(players))) - set(combo)))
+        key = tuple(sorted(combo))
+        if key in seen or complement in seen:
+            continue
+        seen.add(key)
 
-    num_map = {"1": "1", "１": "1", "2": "2", "２": "2", "3": "3", "３": "3"}
-    num = "1"
+        teamA = [players[i] for i in combo]
+        teamB = [players[i] for i in range(len(players)) if i not in combo]
+        sumA = sum(p['point'] for p in teamA)
+        sumB = sum(p['point'] for p in teamB)
+        diff = abs(sumA - sumB)
+        if diff <= 1:
+            valid_combinations.append((teamA, teamB, diff))
 
-    for k, v in num_map.items():
-        if text.endswith(k):
-            num = v
-            text = text[:-len(k)]
-            break
+    if not valid_combinations:
+        return None, None, None, 0, 0
 
-    rank_name = next((v for k, v in table.items() if k in text), None)
-    if not rank_name:
-        return None  # ❌ ランクに該当しない場合
-
-    if rank_name == "レディアント":
-        return rank_name
-    return f"{rank_name}{num}"
+    total = len(valid_combinations)
+    selected_index = random.randint(0, total - 1)
+    teamA, teamB, diff = valid_combinations[selected_index]
+    return teamA, teamB, diff, selected_index + 1, total
 
 
 # ============================================================
-#  チーム分けアルゴリズム（偶数・奇数どちらでもOK）
-# ============================================================
-def split_balanced_teams(players):
-    n = len(players)
-    best_diff = 999
-    best_pair = ([], [])
-    for r in range(n // 2, (n // 2) + 2):
-        for combo in itertools.combinations(players, r):
-            other = [p for p in players if p not in combo]
-            sumA = sum(p['point'] for p in combo)
-            sumB = sum(p['point'] for p in other)
-            diff = abs(sumA - sumB)
-            if diff < best_diff:
-                best_diff = diff
-                best_pair = (combo, other)
-            if diff <= 1:
-                return combo, other, diff
-    return best_pair[0], best_pair[1], best_diff
-
-
-# ============================================================
-#  スラッシュコマンドグループ
+# スラッシュコマンド
 # ============================================================
 peko = SlashCommandGroup("peko", "PekoriBotのコマンド群", guild_ids=GUILD_IDS)
-
-
-# ===============================
-# /peko rank
-# ===============================
-@peko.command(name="rank", description="自分のランクを登録します（例：ゴールド2 / gold2 / ダイヤ3 / ase1 など）")
-async def rank(ctx, rank: str):
-    user = ctx.author
-    user_id = str(user.id)
-    username = user.display_name
-    avatar_url = user.display_avatar.url
-
-    matched_rank = normalize_rank(rank)
-
-    # ❌ 無効なランクの場合
-    if not matched_rank:
-        await ctx.respond(
-            f"⚠️ **{rank}** は有効なランクとして認識できませんでした。\n"
-            "例：`ゴールド2` / `gold2` / `ダイヤ3` / `ase1` などの形式で入力してください。"
-        )
-        return
-
-    payload = {
-        "action": "add",
-        "user_id": user_id,
-        "username": username,
-        "avatar_url": avatar_url,
-        "rank": matched_rank
-    }
-
-    await ctx.defer()
-    async with aiohttp.ClientSession() as session:
-        async with session.post(GAS_WEBHOOK_URL, json=payload) as resp:
-            text = await resp.text()
-
-    if "ADDED" in text:
-        await ctx.followup.send(f"✅ {username} さんを **{matched_rank}** で登録しました！")
-    elif "UPDATED" in text:
-        await ctx.followup.send(f"🔁 {username} さんのランクを **{matched_rank}** に更新しました！")
-    else:
-        await ctx.followup.send(f"⚠️ 登録に失敗しました（{text}）")
-
-
-# ===============================
-# /peko remove
-# ===============================
-@peko.command(name="remove", description="登録データを削除します")
-async def remove(ctx):
-    user = ctx.author
-    payload = {"action": "remove", "user_id": str(user.id)}
-
-    async with aiohttp.ClientSession() as session:
-        async with session.post(GAS_WEBHOOK_URL, json=payload) as resp:
-            text = await resp.text()
-
-    if "REMOVED" in text:
-        await ctx.respond("🗑️ 登録情報を削除しました。")
-    elif "NOT_FOUND" in text:
-        await ctx.respond("⚠️ 登録が見つかりませんでした。")
-    else:
-        await ctx.respond(f"⚠️ 削除処理に失敗しました（{text}）")
-
-
-# ===============================
-# /peko rename
-# ===============================
-@peko.command(name="rename", description="スプレッドシート上のニックネームを変更します")
-async def rename(ctx, new_name: str):
-    user = ctx.author
-    payload = {"action": "rename", "user_id": str(user.id), "new_name": new_name}
-
-    async with aiohttp.ClientSession() as session:
-        async with session.post(GAS_WEBHOOK_URL, json=payload) as resp:
-            text = await resp.text()
-
-    if "UPDATED_RENAME" in text:
-        await ctx.respond(f"✏️ ニックネームを **{new_name}** に変更しました！")
-    elif "NOT_FOUND" in text:
-        await ctx.respond("⚠️ 登録が見つかりません。先に `/peko rank` で登録してください。")
-    else:
-        await ctx.respond(f"⚠️ 変更に失敗しました（{text}）")
 
 
 # ===============================
@@ -203,15 +124,17 @@ async def team(ctx):
         await ctx.followup.send(f"⚠️ データ取得エラー: {data}")
         return
 
-    # IDを文字列で統一
+    # ID統一
     registered = []
     for d in data:
         try:
+            rank = d.get("rank", "不明")
+            point = RANK_POINTS.get(rank, 0)
             registered.append({
                 "user_id": str(d.get("user_id")),
                 "name": d.get("name", "不明"),
-                "rank": d.get("rank", "不明"),
-                "point": int(d.get("point", 0))
+                "rank": rank,
+                "point": point
             })
         except Exception as e:
             logging.warning(f"Invalid entry: {d} ({e})")
@@ -224,22 +147,33 @@ async def team(ctx):
         await ctx.followup.send(msg)
         return
 
-    teamA, teamB, diff = split_balanced_teams(registered)
+    teamA, teamB, diff, idx, total = generate_balanced_teams(registered)
 
-    embed = discord.Embed(title="チーム分け結果", color=main_color)
-    embed.add_field(
-        name="🟥 アタッカー",
-        value="\n".join([f"{p['name']}（{p['rank']}）" for p in teamA]) + f"\n戦力：{sum(p['point'] for p in teamA)}",
-        inline=True
-    )
-    embed.add_field(
-        name="🟦 ディフェンダー",
-        value="\n".join([f"{p['name']}（{p['rank']}）" for p in teamB]) + f"\n戦力：{sum(p['point'] for p in teamB)}",
-        inline=True
-    )
-    embed.add_field(name="　", value=f"チーム差：{diff}", inline=False)
+    if not teamA:
+        await ctx.followup.send("⚠️ 条件を満たすチーム分けが見つかりませんでした。")
+        return
 
-    await ctx.followup.send(embed=embed)
+    guild = ctx.guild
+    emoji_dict = {e.name: e for e in guild.emojis}
+
+    def format_player_line(p):
+        emoji_name = RANK_TO_EMOJI.get(p['rank'])
+        emoji = emoji_dict.get(emoji_name)
+        emoji_text = f"{emoji}" if emoji else f":{emoji_name}:"
+        return f"{emoji_text} {p['name']}"
+
+    powerA = sum(p['point'] for p in teamA)
+    powerB = sum(p['point'] for p in teamB)
+
+    embed_atk = discord.Embed(title="アタッカー", color=atk_color)
+    embed_def = discord.Embed(title="ディフェンダー", color=def_color)
+    embed_info = discord.Embed(color=info_color)
+
+    embed_atk.description = "\n".join([format_player_line(p) for p in teamA]) + f"\n戦力：{powerA}"
+    embed_def.description = "\n".join([format_player_line(p) for p in teamB]) + f"\n戦力：{powerB}"
+    embed_info.description = f"組み合わせ候補：{idx}/{total}"
+
+    await ctx.followup.send(embeds=[embed_atk, embed_def, embed_info])
 
 
 bot.add_application_command(peko)
@@ -250,7 +184,7 @@ bot.add_application_command(peko)
 # ===============================
 @bot.event
 async def on_ready():
-    await bot.change_presence(activity=discord.Game(name="/peko rank, team, etc"))
+    await bot.change_presence(activity=discord.Game(name="/peko team"))
     logging.info(f"✅ Logged in as {bot.user} (id: {bot.user.id})")
 
 
