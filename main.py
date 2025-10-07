@@ -46,14 +46,12 @@ RANK_POINTS = {
 def generate_balanced_teams(players):
     """
     プレイヤーリスト [(name, rank, point, id), ...] をもとに
-    戦力差が小さいチーム分けを探す。
-    戦力差1以内 → なければ2以内 → 3以内... と段階的に緩和。
+    戦力差1以内→2以内→3以内...と順に探す。
     """
     all_combos = list(itertools.combinations(range(len(players)), len(players)//2))
     seen = set()
 
-    # 差の許容値を1から順に広げる（1～5くらいまで現実的）
-    for max_diff in range(1, 6):
+    for max_diff in range(1, 999):  # 上限なし（現実的にはすぐ見つかる）
         valid_combinations = []
 
         for combo in all_combos:
@@ -73,7 +71,6 @@ def generate_balanced_teams(players):
             if diff <= max_diff:
                 valid_combinations.append((teamA, teamB, diff))
 
-        # 条件を満たす組み合わせが見つかったら即採用
         if valid_combinations:
             total = len(valid_combinations)
             selected_index = random.randint(0, total - 1)
@@ -81,10 +78,7 @@ def generate_balanced_teams(players):
             logging.info(f"✅ 戦力差 {max_diff} 以下でマッチング成功 ({len(valid_combinations)}通り)")
             return teamA, teamB, diff, selected_index + 1, total
 
-    # どの差でも見つからなかった場合
-    logging.warning("⚠️ バランスチームが見つかりませんでした。")
     return None, None, None, 0, 0
-
 
 
 # ============================================================
@@ -93,32 +87,36 @@ def generate_balanced_teams(players):
 peko = SlashCommandGroup("peko", "PekoriBotのコマンド群", guild_ids=GUILD_IDS)
 
 
-# ✅ ランク登録コマンド
-@peko.command(name="rank", description="自分のランクを登録（全角・略称・英語OK）")
-async def rank(ctx, rank_name: str):
+# ✅ ランク登録（引数を使わずテキスト全体から取得）
+@peko.command(name="rank", description="自分のランクを登録（例：/peko rank ゴールド２）")
+async def rank(ctx):
     await ctx.defer()
-
     user = ctx.author
     avatar_url = user.display_avatar.url
     username = user.display_name
     user_id = str(user.id)
 
-    # --- 入力整形 ---
+    # ---- メッセージ内容を直接取得 ----
+    full_text = ctx.interaction.data.get("options")
+    if not full_text:
+        await ctx.followup.send("⚠️ ランクを入力してください（例：`/peko rank ゴールド2`）")
+        return
+    rank_name = full_text[0]["value"]
+
+    # ---- 整形・変換 ----
     input_text = rank_name.strip().lower().replace("　", "").replace(" ", "")
-    # ✅ 全角数字 → 半角数字
     input_text = re.sub(r"[０-９]", lambda m: chr(ord(m.group(0)) - 65248), input_text)
-    # ✅ 数字統一
     input_text = re.sub(r"(\d+)", lambda m: str(int(m.group(1))), input_text)
 
-    # --- ランク正規化 ---
+    # ---- ランク表記ゆれ ----
     matched_rank = None
     RANK_NORMALIZE = {
         r"^(iron|あいあん|アイアン)": "アイアン",
         r"^(bronze|ぶろんず|ブロンズ|ブロ|ぶろ)": "ブロンズ",
-        r"^(silver|しるばー|シルバー|シル|汁)": "シルバー",  # ✅ 「しるばー」と「汁」対応
+        r"^(silver|しるばー|しる|シルバー|シル|汁)": "シルバー",
         r"^(gold|ごーるど|ゴールド|ゴル|ごる)": "ゴールド",
         r"^(plat|platinum|ぷらちな|ぷら|プラ|プラチナ)": "プラチナ",
-        r"^(dia|diamond|だいや|ダイヤ)": "ダイヤ",
+        r"^(dia|diamond|だいや|だいやもんど|ダイヤ|ダイヤモンド)": "ダイヤモンド",
         r"^(ase|ascendant|あせ|汗|アセ|アセンダント)": "アセンダント",
         r"^(imm|immortal|いも|芋|イモ|イモータル|imo)": "イモータル",
         r"^(rad|radiant|れでぃ|レディ|レディアント)": "レディアント",
@@ -131,7 +129,6 @@ async def rank(ctx, rank_name: str):
             matched_rank = f"{base}{num}"
             break
 
-    # --- 無効ランクエラー ---
     if not matched_rank or matched_rank not in RANK_POINTS:
         await ctx.followup.send(
             f"⚠️ `{rank_name}` は認識できませんでした。\n"
@@ -139,7 +136,7 @@ async def rank(ctx, rank_name: str):
         )
         return
 
-    # --- GAS送信 ---
+    # ---- GASへ送信 ----
     payload = {
         "action": "add",
         "username": username,
@@ -198,7 +195,6 @@ async def team(ctx):
 
     await ctx.defer()
 
-    # --- GASからランクデータを取得 ---
     user_ids = [str(m.id) for m in members]
     payload = {"action": "fetch_team_data", "user_ids": user_ids}
 
@@ -213,7 +209,6 @@ async def team(ctx):
         await ctx.followup.send(f"⚠️ データ取得エラー: {data}")
         return
 
-    # --- プレイヤー整形 ---
     players = []
     for d in data:
         name = d.get("name", "不明")
@@ -228,7 +223,6 @@ async def team(ctx):
         await ctx.followup.send(msg)
         return
 
-    # --- チーム分け ---
     teamA, teamB, diff, idx, total = generate_balanced_teams(players)
     if not teamA:
         await ctx.followup.send("⚠️ 条件を満たすチーム分けが見つかりませんでした。")
@@ -248,7 +242,6 @@ async def team(ctx):
 bot.add_application_command(peko)
 
 
-# ---- 起動 ----
 @bot.event
 async def on_ready():
     await bot.change_presence(activity=discord.Game(name="/peko rank / team"))
