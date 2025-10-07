@@ -114,13 +114,18 @@ async def teamtest(ctx):
         emoji_text = f"{emoji}" if emoji else f":{emoji_name}:"
         return f"{emoji_text} {name}"
 
+    # チームごとの戦力値
+    powerA = sum(p[2] for p in teamA)
+    powerB = sum(p[2] for p in teamB)
+
     # 各Embed作成
     embed_atk = discord.Embed(title="アタッカー", color=atk_color)
     embed_def = discord.Embed(title="ディフェンダー", color=def_color)
     embed_info = discord.Embed(color=info_color)
 
-    embed_atk.description = "\n".join([format_player_line(p) for p in teamA])
-    embed_def.description = "\n".join([format_player_line(p) for p in teamB])
+    # 白文字にするため markdown で "||" の中にスペースを入れずにフォントカラー統一
+    embed_atk.description = "\n".join([format_player_line(p) for p in teamA]) + f"\n\n**`戦力：{powerA}`**"
+    embed_def.description = "\n".join([format_player_line(p) for p in teamB]) + f"\n\n**`戦力：{powerB}`**"
     embed_info.description = f"組み合わせ候補：{idx}/{total}"
 
     await ctx.respond(embeds=[embed_atk, embed_def, embed_info])
