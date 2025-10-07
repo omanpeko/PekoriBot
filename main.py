@@ -21,9 +21,9 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 GUILD_IDS = [1357655899212349490]
 
 # ---- カラー設定 ----
-atk_color  = discord.Color.from_rgb(255, 110, 110)  # 赤
-def_color  = discord.Color.from_rgb(0, 200, 190)    # 青緑
-info_color = discord.Color.from_rgb(126, 126, 126)  # グレー (#7E7E7E)
+main_color = discord.Color.from_rgb(126, 126, 126)  # 全体統一（グレー基調）
+atk_color  = discord.Color.from_rgb(255, 110, 110)  # 赤（絵文字枠には未使用）
+def_color  = discord.Color.from_rgb(0, 200, 170)    # 青緑（絵文字枠には未使用）
 
 # ---- ランクポイントテーブル ----
 RANK_POINTS = {
@@ -86,7 +86,7 @@ def generate_balanced_teams(players):
 peko = SlashCommandGroup("peko", "PekoriBotのコマンド群", guild_ids=GUILD_IDS)
 
 
-@peko.command(name="teamtest", description="ランダム10人でチーム分けをテスト")
+@peko.command(name="teamtest", description="ランダム10人でチーム分けをテスト（横並び表示）")
 async def teamtest(ctx):
     await ctx.defer()
 
@@ -118,17 +118,26 @@ async def teamtest(ctx):
     powerA = sum(p[2] for p in teamA)
     powerB = sum(p[2] for p in teamB)
 
-    # 各Embed作成
-    embed_atk = discord.Embed(title="アタッカー", color=atk_color)
-    embed_def = discord.Embed(title="ディフェンダー", color=def_color)
-    embed_info = discord.Embed(color=info_color)
+    # ---- Embed（1枚で横並び）----
+    embed = discord.Embed(title="チーム分け結果", color=main_color)
 
-    embed_atk.description = "\n".join([format_player_line(p) for p in teamA]) + f"\n戦力：{powerA}"
-    embed_def.description = "\n".join([format_player_line(p) for p in teamB]) + f"\n戦力：{powerB}"
+    embed.add_field(
+        name="🟥 アタッカー",
+        value="\n".join([format_player_line(p) for p in teamA]) + f"\n戦力：{powerA}",
+        inline=True
+    )
+    embed.add_field(
+        name="🟩 ディフェンダー",
+        value="\n".join([format_player_line(p) for p in teamB]) + f"\n戦力：{powerB}",
+        inline=True
+    )
+    embed.add_field(
+        name="💡 情報",
+        value=f"組み合わせ候補：{idx}/{total}",
+        inline=False
+    )
 
-    embed_info.description = f"組み合わせ候補：{idx}/{total}"
-
-    await ctx.respond(embeds=[embed_atk, embed_def, embed_info])
+    await ctx.respond(embed=embed)
 
 
 bot.add_application_command(peko)
