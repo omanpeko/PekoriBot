@@ -41,35 +41,50 @@ RANK_POINTS = {
 }
 
 # ============================================================
-# 🧮 チーム分けアルゴリズム（戦力差1以内）
+# 🧮 チーム分けアルゴリズム（戦力差を段階的に緩和）
 # ============================================================
 def generate_balanced_teams(players):
-    valid_combinations = []
+    """
+    プレイヤーリスト [(name, rank, point, id), ...] をもとに
+    戦力差が小さいチーム分けを探す。
+    戦力差1以内 → なければ2以内 → 3以内... と段階的に緩和。
+    """
     all_combos = list(itertools.combinations(range(len(players)), len(players)//2))
     seen = set()
 
-    for combo in all_combos:
-        complement = tuple(sorted(set(range(len(players))) - set(combo)))
-        key = tuple(sorted(combo))
-        if key in seen or complement in seen:
-            continue
-        seen.add(key)
+    # 差の許容値を1から順に広げる（1～5くらいまで現実的）
+    for max_diff in range(1, 6):
+        valid_combinations = []
 
-        teamA = [players[i] for i in combo]
-        teamB = [players[i] for i in range(len(players)) if i not in combo]
-        sumA = sum(p[2] for p in teamA)
-        sumB = sum(p[2] for p in teamB)
-        diff = abs(sumA - sumB)
-        if diff <= 1:
-            valid_combinations.append((teamA, teamB, diff))
+        for combo in all_combos:
+            complement = tuple(sorted(set(range(len(players))) - set(combo)))
+            key = tuple(sorted(combo))
+            if key in seen or complement in seen:
+                continue
+            seen.add(key)
 
-    if not valid_combinations:
-        return None, None, None, 0, 0
+            teamA = [players[i] for i in combo]
+            teamB = [players[i] for i in range(len(players)) if i not in combo]
 
-    total = len(valid_combinations)
-    selected_index = random.randint(0, total - 1)
-    teamA, teamB, diff = valid_combinations[selected_index]
-    return teamA, teamB, diff, selected_index + 1, total
+            sumA = sum(p[2] for p in teamA)
+            sumB = sum(p[2] for p in teamB)
+            diff = abs(sumA - sumB)
+
+            if diff <= max_diff:
+                valid_combinations.append((teamA, teamB, diff))
+
+        # 条件を満たす組み合わせが見つかったら即採用
+        if valid_combinations:
+            total = len(valid_combinations)
+            selected_index = random.randint(0, total - 1)
+            teamA, teamB, diff = valid_combinations[selected_index]
+            logging.info(f"✅ 戦力差 {max_diff} 以下でマッチング成功 ({len(valid_combinations)}通り)")
+            return teamA, teamB, diff, selected_index + 1, total
+
+    # どの差でも見つからなかった場合
+    logging.warning("⚠️ バランスチームが見つかりませんでした。")
+    return None, None, None, 0, 0
+
 
 
 # ============================================================
