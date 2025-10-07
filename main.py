@@ -1,13 +1,11 @@
 # -*- coding: utf-8 -*-
 import os
 import logging
-import random
-import itertools
 import re
+import aiohttp
 import discord
 from discord.ext import commands
 from discord.commands import SlashCommandGroup
-import aiohttp  # GAS連携
 
 logging.basicConfig(level=logging.INFO)
 
@@ -41,87 +39,55 @@ RANK_POINTS = {
     "レディアント": 25
 }
 
-# ---- ランク名ゆれ → 正規化テーブル ----
+# ---- ランク表記ゆれ対応 ----
 RANK_NORMALIZE = {
-    # Iron
     r"^(iron|あいあん|アイアン)": "アイアン",
-    # Bronze
     r"^(bronze|ぶろんず|ブロンズ)": "ブロンズ",
-    # Silver
     r"^(silver|しるば|シルバー)": "シルバー",
-    # Gold
     r"^(gold|ごーるど|ゴールド)": "ゴールド",
-    # Platinum
     r"^(plat|platinum|ぷらちな|プラチナ)": "プラチナ",
-    # Diamond
     r"^(dia|diamond|だいや|ダイヤ)": "ダイヤ",
-    # Ascendant
-    r"^(ase|ascendant|あせ|アセンダント)": "アセンダント",
-    # Immortal
-    r"^(imm|immortal|いも|イモータル)": "イモータル",
-    # Radiant
-    r"^(rad|radiant|れでぃ|レディアント)": "レディアント",
+    r"^(ase|ascendant|あせ|汗|アセ|アセンダント)": "アセンダント",
+    r"^(imm|immortal|いも|芋|イモ|イモータル)": "イモータル",
+    r"^(rad|radiant|れでぃ|レディ|レディアント)": "レディアント",
 }
 
-# ---- チーム分けアルゴリズム（前と同じ）----
-def generate_balanced_teams(players):
-    valid_combinations = []
-    all_combos = list(itertools.combinations(range(10), 5))
-    seen = set()
-    for combo in all_combos:
-        complement = tuple(sorted(set(range(10)) - set(combo)))
-        key = tuple(sorted(combo))
-        if key in seen or complement in seen:
-            continue
-        seen.add(key)
-        teamA = [players[i] for i in combo]
-        teamB = [players[i] for i in range(10) if i not in combo]
-        sumA = sum(p[2] for p in teamA)
-        sumB = sum(p[2] for p in teamB)
-        diff = abs(sumA - sumB)
-        if diff <= 1:
-            valid_combinations.append((teamA, teamB, diff))
-    if not valid_combinations:
-        return None, None, None, 0, 0
-    total = len(valid_combinations)
-    selected_index = random.randint(0, total - 1)
-    teamA, teamB, diff = valid_combinations[selected_index]
-    return teamA, teamB, diff, selected_index + 1, total
-
-
-# ---- /peko コマンドグループ ----
+# ---- /peko グループ ----
 peko = SlashCommandGroup("peko", "PekoriBotのコマンド群", guild_ids=GUILD_IDS)
 
-
-# 📝 ランク登録コマンド（入力ゆれ対応）
+# ✅ ランク登録コマンド
 @peko.command(name="rank", description="自分のランクを登録（全角・英語・略称OK）")
 async def rank(ctx, rank_name: str):
+    await ctx.defer()
+
     user = ctx.author
     avatar_url = user.display_avatar.url
     username = user.display_name
     user_id = str(user.id)
 
-    # 入力整形
+    # --- 入力整形 ---
     input_text = rank_name.strip().lower().replace("　", "").replace(" ", "")
-    input_text = re.sub(r"(\d+)", lambda m: str(int(m.group(1))), input_text)  # 全角数字→半角数字
+    input_text = re.sub(r"(\d+)", lambda m: str(int(m.group(1))), input_text)
 
     # --- ランク正規化 ---
     matched_rank = None
     for pattern, base in RANK_NORMALIZE.items():
         if re.match(pattern, input_text):
-            # 数字がある場合は末尾に追加
             m = re.search(r"(\d+)", input_text)
             num = m.group(1) if m else ""
             matched_rank = f"{base}{num}"
             break
 
-    # 不明ランク対応
     if not matched_rank or matched_rank not in RANK_POINTS:
-        await ctx.respond(f"⚠️ `{rank_name}` は認識できませんでした。例：`ゴールド2` / `gold2` / `plat3` など")
+        await ctx.followup.send(
+            f"⚠️ `{rank_name}` は認識できませんでした。\n"
+            f"例：`ゴールド2` / `gold2` / `ダイヤ3` / `ase1` など"
+        )
         return
 
     # --- GASに送信 ---
     payload = {
+        "action": "add",
         "username": username,
         "user_id": user_id,
         "avatar_url": avatar_url,
@@ -130,21 +96,45 @@ async def rank(ctx, rank_name: str):
 
     async with aiohttp.ClientSession() as session:
         async with session.post(GAS_WEBHOOK_URL, json=payload) as response:
+            text = await response.text()
             if response.status == 200:
-                await ctx.respond(f"✅ {username} さんのランク **{matched_rank}** を登録しました！")
+                if "UPDATED" in text:
+                    msg = f"🔁 {username} さんのランクを **{matched_rank}** に更新しました！"
+                elif "ADDED" in text:
+                    msg = f"✅ {username} さんのランク **{matched_rank}** を新規登録しました！"
+                else:
+                    msg = f"✅ {username} さんのランク **{matched_rank}** を登録しました！（不明レスポンス）"
+                await ctx.followup.send(msg)
             else:
-                await ctx.respond(f"⚠️ 登録に失敗しました（{response.status}）")
+                await ctx.followup.send(f"⚠️ 登録に失敗しました（{response.status}）")
 
+# 🗑️ 登録削除コマンド
+@peko.command(name="remove", description="自分のランク登録データを削除します")
+async def remove(ctx):
+    await ctx.defer()
+    user = ctx.author
+    user_id = str(user.id)
+
+    payload = {"action": "remove", "user_id": user_id}
+
+    async with aiohttp.ClientSession() as session:
+        async with session.post(GAS_WEBHOOK_URL, json=payload) as response:
+            text = await response.text()
+            if "REMOVED" in text:
+                msg = f"🗑️ {user.display_name} さんの登録データを削除しました。"
+            elif "NOT_FOUND" in text:
+                msg = f"⚠️ {user.display_name} さんの登録データは見つかりませんでした。"
+            else:
+                msg = f"⚠️ 削除処理に失敗しました（{response.status}）"
+            await ctx.followup.send(msg)
 
 bot.add_application_command(peko)
-
 
 # ---- 起動 ----
 @bot.event
 async def on_ready():
     await bot.change_presence(activity=discord.Game(name="/peko rank"))
     logging.info(f"✅ Logged in as {bot.user} (id: {bot.user.id})")
-
 
 if __name__ == "__main__":
     token = os.getenv("DISCORD_TOKEN", "").strip().strip('"').strip("'")
