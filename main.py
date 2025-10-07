@@ -177,30 +177,30 @@ async def team(ctx):
         await ctx.respond("⚠️ 2人以上で実行してください。")
         return
 
+    # 💡 処理が長いので defer
+    await ctx.defer()
+
     user_ids = [str(m.id) for m in members]
     payload = {"action": "fetch_team_data", "user_ids": user_ids}
 
     async with aiohttp.ClientSession() as session:
         async with session.post(GAS_WEBHOOK_URL, json=payload) as resp:
             if resp.status != 200:
-                await ctx.respond(f"⚠️ スプレッドシート接続エラー ({resp.status})")
+                await ctx.followup.send(f"⚠️ スプレッドシート接続エラー ({resp.status})")
                 return
             data = await resp.json()
 
     if not data:
-        await ctx.respond("⚠️ スプレッドシートに登録されたランク情報が見つかりません。")
+        await ctx.followup.send("⚠️ スプレッドシートに登録されたランク情報が見つかりません。")
         return
 
-    # IDを文字列化して一致確認
     registered = [d for d in data if int(d.get("point", 0)) > 0]
     registered_ids = {str(d.get("user_id")) for d in registered}
-
-    # ❌ 未登録判定を display_name ではなく ID で行う
     unregistered = [m.display_name for m in members if str(m.id) not in registered_ids]
 
     if unregistered:
         msg = "⚠️ 以下のメンバーは未登録です：\n" + "\n".join(unregistered)
-        await ctx.respond(msg)
+        await ctx.followup.send(msg)
         return
 
     teamA, teamB, diff = split_balanced_teams(registered)
@@ -218,7 +218,9 @@ async def team(ctx):
     )
     embed.add_field(name="　", value=f"チーム差：{diff}", inline=False)
 
-    await ctx.respond(embed=embed)
+    # deferしたら followup.send を使う
+    await ctx.followup.send(embed=embed)
+
 
 
 
