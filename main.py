@@ -21,9 +21,9 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 GUILD_IDS = [1357655899212349490]
 
 # ---- カラー設定 ----
-atk_color  = discord.Color.from_rgb(255, 120, 120)  # 薄い赤
+atk_color  = discord.Color.from_rgb(200, 120, 120)  # 落ち着いた赤
 def_color  = discord.Color.from_rgb(0, 180, 170)    # 青緑
-info_color = discord.Color.from_rgb(255, 140, 0)    # オレンジ
+info_color = discord.Color.from_rgb(126, 126, 126)  # グレー (#7E7E7E)
 
 # ---- ランクポイントテーブル ----
 RANK_POINTS = {
