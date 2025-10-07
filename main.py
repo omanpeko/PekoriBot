@@ -49,6 +49,22 @@ RANK_TO_EMOJI = {
     "レディアント": "Radiant"
 }
 
+# ---- キャラ名リスト（4〜9文字）----
+CHAR_NAMES = [
+    # 4文字
+    "リオナ", "カレン", "ユウキ", "トウマ", "サララ",
+    # 5文字
+    "アキトラ", "ミナト", "レイナ", "タカオ", "シズク",
+    # 6文字
+    "ハルフォ", "アマリス", "カグラミ", "リベルタ", "ノアール",
+    # 7文字
+    "セレスティ", "ユリウスナ", "ルミナリア", "カナデアス", "アーディン",
+    # 8文字
+    "シグルディア", "ラファエリア", "フィオレンテ", "グランディア", "アルフォリア",
+    # 9文字（新規）
+    "ミツキオリオン", "アスタルテリア", "フェルナリアン", "クロノディアス", "ヴァレリアーナ"
+]
+
 # ---- チーム分けアルゴリズム ----
 def generate_balanced_teams(players):
     valid_combinations = []
@@ -83,17 +99,20 @@ def generate_balanced_teams(players):
 peko = SlashCommandGroup("peko", "PekoriBotのコマンド群", guild_ids=GUILD_IDS)
 
 
-@peko.command(name="teamtest", description="ランダム10人でチーム分けをテスト（横並び表示）")
+@peko.command(name="teamtest", description="キャラ名（4〜9文字）でチーム分けをテスト")
 async def teamtest(ctx):
     await ctx.defer()
 
     ranks = list(RANK_POINTS.keys())
     players = []
-    for i in range(10):
-        name = chr(65 + i)  # A〜J
+
+    # 10人分のキャラ名をランダムに選ぶ（重複なし）
+    names = random.sample(CHAR_NAMES, 10)
+
+    for name in names:
         rank = random.choice(ranks)
         point = RANK_POINTS[rank]
-        players.append((name, rank, point))  # (名前, ランク, ポイント)
+        players.append((name, rank, point))
 
     teamA, teamB, diff, idx, total = generate_balanced_teams(players)
 
