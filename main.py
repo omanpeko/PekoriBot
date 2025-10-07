@@ -6,6 +6,7 @@ import itertools
 import discord
 from discord.ext import commands
 from discord.commands import SlashCommandGroup
+import aiohttp  # GASとの通信
 
 logging.basicConfig(level=logging.INFO)
 
@@ -21,7 +22,10 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 GUILD_IDS = [1357655899212349490]
 
 # ---- カラー設定 ----
-main_color = discord.Color.from_rgb(255, 140, 0)  # オレンジ (#FF8C00)
+main_color = discord.Color.from_rgb(255, 140, 0)  # オレンジ
+
+# ---- Google Apps ScriptのURL ----
+GAS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbyjOtoYq8zeOfA-ph9GzdUWJmGONWF0N9UNk6RffHbi6XDki58LEmFzfIZpMWkV6X1hrQ/exec"
 
 # ---- ランクポイントテーブル ----
 RANK_POINTS = {
@@ -36,32 +40,13 @@ RANK_POINTS = {
     "レディアント": 25
 }
 
-# ---- ランク名 → 絵文字名マッピング ----
-RANK_TO_EMOJI = {
-    "アイアン1": "Iron1", "アイアン2": "Iron2", "アイアン3": "Iron3",
-    "ブロンズ1": "Bronze1", "ブロンズ2": "Bronze2", "ブロンズ3": "Bronze3",
-    "シルバー1": "Silver1", "シルバー2": "Silver2", "シルバー3": "Silver3",
-    "ゴールド1": "Gold1", "ゴールド2": "Gold2", "ゴールド3": "Gold3",
-    "プラチナ1": "Platinum1", "プラチナ2": "Platinum2", "プラチナ3": "Platinum3",
-    "ダイヤ1": "Diamond1", "ダイヤ2": "Diamond2", "ダイヤ3": "Diamond3",
-    "アセンダント1": "Ascendant1", "アセンダント2": "Ascendant2", "アセンダント3": "Ascendant3",
-    "イモータル1": "Immortal1", "イモータル2": "Immortal2", "イモータル3": "Immortal3",
-    "レディアント": "Radiant"
-}
-
-# ---- キャラ名リスト（4〜9文字）----
+# ---- キャラ名リスト ----
 CHAR_NAMES = [
-    # 4文字
     "リオナ", "カレン", "ユウキ", "トウマ", "サララ",
-    # 5文字
     "アキトラ", "ミナト", "レイナ", "タカオ", "シズク",
-    # 6文字
     "ハルフォ", "アマリス", "カグラミ", "リベルタ", "ノアール",
-    # 7文字
     "セレスティ", "ユリウスナ", "ルミナリア", "カナデアス", "アーディン",
-    # 8文字
     "シグルディア", "ラファエリア", "フィオレンテ", "グランディア", "アルフォリア",
-    # 9文字（新規）
     "ミツキオリオン", "アスタルテリア", "フェルナリアン", "クロノディアス", "ヴァレリアーナ"
 ]
 
@@ -99,14 +84,13 @@ def generate_balanced_teams(players):
 peko = SlashCommandGroup("peko", "PekoriBotのコマンド群", guild_ids=GUILD_IDS)
 
 
-@peko.command(name="teamtest", description="キャラ名（4〜9文字）でチーム分けをテスト")
+# 🎮 チーム分け
+@peko.command(name="teamtest", description="キャラ名でチーム分けをテスト")
 async def teamtest(ctx):
     await ctx.defer()
 
     ranks = list(RANK_POINTS.keys())
     players = []
-
-    # 10人分のキャラ名をランダムに選ぶ（重複なし）
     names = random.sample(CHAR_NAMES, 10)
 
     for name in names:
@@ -115,47 +99,53 @@ async def teamtest(ctx):
         players.append((name, rank, point))
 
     teamA, teamB, diff, idx, total = generate_balanced_teams(players)
-
     if not teamA:
         await ctx.respond("⚠️ 条件を満たすチーム分けが見つかりませんでした。")
         return
 
-    guild = ctx.guild
-    emoji_dict = {e.name: e for e in guild.emojis}
-
-    def format_player_line(p):
-        name, rank, _ = p
-        emoji_name = RANK_TO_EMOJI.get(rank)
-        emoji = emoji_dict.get(emoji_name)
-        emoji_text = f"{emoji}" if emoji else f":{emoji_name}:"
-        return f"{emoji_text} {name}"
-
-    # チームごとの戦力値
     powerA = sum(p[2] for p in teamA)
     powerB = sum(p[2] for p in teamB)
 
-    # ---- Embed（横並び）----
     embed = discord.Embed(title="チーム分け結果", color=main_color)
-
-    embed.add_field(
-        name="🟥 アタッカー＿＿＿＿",
-        value="\n".join([format_player_line(p) for p in teamA]) + f"\n戦力：{powerA}",
-        inline=True
-    )
-    embed.add_field(
-        name="🟦 ディフェンダー",
-        value="\n".join([format_player_line(p) for p in teamB]) + f"\n戦力：{powerB}",
-        inline=True
-    )
-
-    # 情報欄 → 改行代わり（全角スペース）
-    embed.add_field(
-        name="　",
-        value=f"組み合わせ候補：{idx}/{total}",
-        inline=False
-    )
+    embed.add_field(name="🟥 アタッカー＿＿＿＿", value="\n".join([f"{p[0]} ({p[1]})" for p in teamA]) + f"\n戦力：{powerA}", inline=True)
+    embed.add_field(name="🟦 ディフェンダー", value="\n".join([f"{p[0]} ({p[1]})" for p in teamB]) + f"\n戦力：{powerB}", inline=True)
+    embed.add_field(name="　", value=f"組み合わせ候補：{idx}/{total}", inline=False)
 
     await ctx.respond(embed=embed)
+
+
+# 📝 ランク登録（上書き対応）
+@peko.command(name="rank", description="自分のランクを登録します（上書き対応）")
+async def rank(ctx, rank_name: str):
+    user = ctx.author
+    avatar_url = user.display_avatar.url
+    username = user.display_name
+    user_id = str(user.id)
+
+    # --- 1. 現在のデータ取得 ---
+    async with aiohttp.ClientSession() as session:
+        async with session.get(GAS_WEBHOOK_URL) as response:
+            existing_data = await response.json()
+
+    # --- 2. 登録情報をGASに送信 ---
+    payload = {
+        "username": username,
+        "user_id": user_id,
+        "avatar_url": avatar_url,
+        "rank": rank_name
+    }
+
+    async with aiohttp.ClientSession() as session:
+        async with session.post(GAS_WEBHOOK_URL, json=payload) as response:
+            if response.status == 200:
+                # --- 上書き or 新規メッセージ判定 ---
+                if existing_data.get("user_id") == user_id:
+                    msg = f"♻️ {username} さんのランクを **{rank_name}** に更新しました！"
+                else:
+                    msg = f"✅ {username} さんのランク **{rank_name}** を登録しました！"
+                await ctx.respond(msg)
+            else:
+                await ctx.respond(f"⚠️ 登録に失敗しました（{response.status}）")
 
 
 bot.add_application_command(peko)
