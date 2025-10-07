@@ -138,7 +138,7 @@ async def teamtest(ctx):
     embed = discord.Embed(title="チーム分け結果", color=main_color)
 
     embed.add_field(
-        name="🟥 アタッカー",
+        name="🟥 アタッカー______",
         value="\n".join([format_player_line(p) for p in teamA]) + f"\n戦力：{powerA}",
         inline=True
     )
