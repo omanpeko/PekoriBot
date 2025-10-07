@@ -21,8 +21,8 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 GUILD_IDS = [1357655899212349490]
 
 # ---- カラー設定 ----
-atk_color  = discord.Color.from_rgb(255, 110, 110)  # 落ち着いた赤
-def_color  = discord.Color.from_rgb(0, 180, 170)    # 青緑
+atk_color  = discord.Color.from_rgb(255, 110, 110)  # 赤
+def_color  = discord.Color.from_rgb(0, 200, 19W0)    # 青緑
 info_color = discord.Color.from_rgb(126, 126, 126)  # グレー (#7E7E7E)
 
 # ---- ランクポイントテーブル ----
@@ -123,9 +123,9 @@ async def teamtest(ctx):
     embed_def = discord.Embed(title="ディフェンダー", color=def_color)
     embed_info = discord.Embed(color=info_color)
 
-    # 白文字にするため markdown で "||" の中にスペースを入れずにフォントカラー統一
-    embed_atk.description = "\n".join([format_player_line(p) for p in teamA]) + f"\n\n**`戦力：{powerA}`**"
-    embed_def.description = "\n".join([format_player_line(p) for p in teamB]) + f"\n\n**`戦力：{powerB}`**"
+    embed_atk.description = "\n".join([format_player_line(p) for p in teamA]) + f"\n戦力：{powerA}"
+    embed_def.description = "\n".join([format_player_line(p) for p in teamB]) + f"\n戦力：{powerB}"
+
     embed_info.description = f"組み合わせ候補：{idx}/{total}"
 
     await ctx.respond(embeds=[embed_atk, embed_def, embed_info])
