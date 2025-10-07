@@ -42,13 +42,13 @@ RANK_POINTS = {
 # ---- ランク表記ゆれ対応 ----
 RANK_NORMALIZE = {
     r"^(iron|あいあん|アイアン)": "アイアン",
-    r"^(bronze|ぶろんず|ブロンズ)": "ブロンズ",
-    r"^(silver|しるば|シルバー)": "シルバー",
-    r"^(gold|ごーるど|ゴールド)": "ゴールド",
-    r"^(plat|platinum|ぷらちな|プラチナ)": "プラチナ",
+    r"^(bronze|ぶろんず|ブロンズ|ブロ|ぶろ)": "ブロンズ",
+    r"^(silver|しるば|シルバー|シル|しる)": "シルバー",
+    r"^(gold|ごーるど|ゴールド|ゴル|ごる)": "ゴールド",
+    r"^(plat|platinum|ぷらちな|ぷら|プラ|プラチナ)": "プラチナ",
     r"^(dia|diamond|だいや|ダイヤ)": "ダイヤ",
     r"^(ase|ascendant|あせ|汗|アセ|アセンダント)": "アセンダント",
-    r"^(imm|immortal|いも|芋|イモ|イモータル)": "イモータル",
+    r"^(imm|immortal|いも|芋|イモ|イモータル|imo)": "イモータル",
     r"^(rad|radiant|れでぃ|レディ|レディアント)": "レディアント",
 }
 
@@ -56,7 +56,7 @@ RANK_NORMALIZE = {
 peko = SlashCommandGroup("peko", "PekoriBotのコマンド群", guild_ids=GUILD_IDS)
 
 # ✅ ランク登録コマンド
-@peko.command(name="rank", description="自分のランクを登録（全角・英語・略称OK）")
+@peko.command(name="rank", description="自分のランクを登録（全角・略称・英語OK）")
 async def rank(ctx, rank_name: str):
     await ctx.defer()
 
