@@ -191,8 +191,12 @@ async def team(ctx):
         await ctx.respond("⚠️ スプレッドシートに登録されたランク情報が見つかりません。")
         return
 
-    registered = [d for d in data if d["point"] > 0]
-    unregistered = [m.display_name for m in members if str(m.id) not in [d["user_id"] for d in registered]]
+    # IDを文字列化して一致確認
+    registered = [d for d in data if int(d.get("point", 0)) > 0]
+    registered_ids = {str(d.get("user_id")) for d in registered}
+
+    # ❌ 未登録判定を display_name ではなく ID で行う
+    unregistered = [m.display_name for m in members if str(m.id) not in registered_ids]
 
     if unregistered:
         msg = "⚠️ 以下のメンバーは未登録です：\n" + "\n".join(unregistered)
@@ -215,6 +219,7 @@ async def team(ctx):
     embed.add_field(name="　", value=f"チーム差：{diff}", inline=False)
 
     await ctx.respond(embed=embed)
+
 
 
 bot.add_application_command(peko)
