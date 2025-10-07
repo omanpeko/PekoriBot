@@ -23,12 +23,9 @@ GUILD_IDS = [1357655899212349490]
 
 # ---- カラー設定 ----
 main_color = discord.Color.from_rgb(255, 140, 0)
-atk_color  = discord.Color.from_rgb(255, 120, 120)
-def_color  = discord.Color.from_rgb(0, 180, 170)
 
 # ---- GAS URL ----
 GAS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbztYZmisYPC_BbyY-lNG296sIQHZBo_iu1xMcf8M_5_QJX7DGUNcz5Z2HP2gWgW-RvvEg/exec"
-
 
 # ---- ランクポイント ----
 RANK_POINTS = {
@@ -42,20 +39,6 @@ RANK_POINTS = {
     "イモータル1": 22, "イモータル2": 23, "イモータル3": 24,
     "レディアント": 25
 }
-
-# ---- ランク表記ゆれ対応 ----
-RANK_NORMALIZE = {
-    r"^(iron|あいあん|アイアン)": "アイアン",
-    r"^(bronze|ぶろんず|ブロンズ|ブロ|ぶろ)": "ブロンズ",
-    r"^(silver|しるば|シルバー|シル|しる)": "シルバー",
-    r"^(gold|ごーるど|ゴールド|ゴル|ごる)": "ゴールド",
-    r"^(plat|platinum|ぷらちな|ぷら|プラ|プラチナ)": "プラチナ",
-    r"^(dia|diamond|だいや|ダイヤ)": "ダイヤ",
-    r"^(ase|ascendant|あせ|汗|アセ|アセンダント)": "アセンダント",
-    r"^(imm|immortal|いも|芋|イモ|イモータル|imo)": "イモータル",
-    r"^(rad|radiant|れでぃ|レディ|レディアント)": "レディアント",
-}
-
 
 # ============================================================
 # 🧮 チーム分けアルゴリズム（戦力差1以内）
@@ -95,19 +78,37 @@ def generate_balanced_teams(players):
 peko = SlashCommandGroup("peko", "PekoriBotのコマンド群", guild_ids=GUILD_IDS)
 
 
-# ✅ ランク登録
+# ✅ ランク登録コマンド
 @peko.command(name="rank", description="自分のランクを登録（全角・略称・英語OK）")
 async def rank(ctx, rank_name: str):
     await ctx.defer()
+
     user = ctx.author
     avatar_url = user.display_avatar.url
     username = user.display_name
     user_id = str(user.id)
 
+    # --- 入力整形 ---
     input_text = rank_name.strip().lower().replace("　", "").replace(" ", "")
+    # ✅ 全角数字 → 半角数字
+    input_text = re.sub(r"[０-９]", lambda m: chr(ord(m.group(0)) - 65248), input_text)
+    # ✅ 数字統一
     input_text = re.sub(r"(\d+)", lambda m: str(int(m.group(1))), input_text)
 
+    # --- ランク正規化 ---
     matched_rank = None
+    RANK_NORMALIZE = {
+        r"^(iron|あいあん|アイアン)": "アイアン",
+        r"^(bronze|ぶろんず|ブロンズ|ブロ|ぶろ)": "ブロンズ",
+        r"^(silver|しるばー|シルバー|シル|汁)": "シルバー",  # ✅ 「しるばー」と「汁」対応
+        r"^(gold|ごーるど|ゴールド|ゴル|ごる)": "ゴールド",
+        r"^(plat|platinum|ぷらちな|ぷら|プラ|プラチナ)": "プラチナ",
+        r"^(dia|diamond|だいや|ダイヤ)": "ダイヤ",
+        r"^(ase|ascendant|あせ|汗|アセ|アセンダント)": "アセンダント",
+        r"^(imm|immortal|いも|芋|イモ|イモータル|imo)": "イモータル",
+        r"^(rad|radiant|れでぃ|レディ|レディアント)": "レディアント",
+    }
+
     for pattern, base in RANK_NORMALIZE.items():
         if re.match(pattern, input_text):
             m = re.search(r"(\d+)", input_text)
@@ -115,6 +116,7 @@ async def rank(ctx, rank_name: str):
             matched_rank = f"{base}{num}"
             break
 
+    # --- 無効ランクエラー ---
     if not matched_rank or matched_rank not in RANK_POINTS:
         await ctx.followup.send(
             f"⚠️ `{rank_name}` は認識できませんでした。\n"
@@ -122,6 +124,7 @@ async def rank(ctx, rank_name: str):
         )
         return
 
+    # --- GAS送信 ---
     payload = {
         "action": "add",
         "username": username,
@@ -212,12 +215,10 @@ async def team(ctx):
 
     # --- チーム分け ---
     teamA, teamB, diff, idx, total = generate_balanced_teams(players)
-
     if not teamA:
         await ctx.followup.send("⚠️ 条件を満たすチーム分けが見つかりませんでした。")
         return
 
-    # --- 表示作成 ---
     powerA = sum(p[2] for p in teamA)
     powerB = sum(p[2] for p in teamB)
 
