@@ -21,6 +21,11 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 # 即時反映サーバー
 GUILD_IDS = [1357655899212349490]
 
+# ---- カラー設定 ----
+atk_color  = discord.Color.from_rgb(255, 120, 120)  # 薄い赤
+def_color  = discord.Color.from_rgb(0, 180, 170)    # 青緑
+info_color = discord.Color.from_rgb(255, 140, 0)    # オレンジ
+
 # ---- ランクポイントテーブル ----
 RANK_POINTS = {
     "アイアン1": 1, "アイアン2": 2, "アイアン3": 3,
@@ -34,7 +39,7 @@ RANK_POINTS = {
     "レディアント": 25
 }
 
-# ---- Utility: チーム分けアルゴリズム ----
+# ---- チーム分けアルゴリズム ----
 def generate_balanced_teams(players):
     """
     players: [(name, point), ...] 10人分
@@ -90,15 +95,20 @@ async def teamtest(ctx):
         await ctx.respond("⚠️ 条件を満たすチーム分けが見つかりませんでした。")
         return
 
-    embed = discord.Embed(title="チーム分け結果", color=discord.Color.from_rgb(255, 140, 0))
-    embed.add_field(name="アタッカー", value="\n".join([p[0] for p in teamA]), inline=True)
-    embed.add_field(name="ディフェンダー", value="\n".join([p[0] for p in teamB]), inline=True)
-    embed.add_field(name="　", value=f"組み合わせ候補：{idx}/{total}", inline=False)
+    # 各Embed作成
+    embed_atk = discord.Embed(title="アタッカー", color=atk_color)
+    embed_def = discord.Embed(title="ディフェンダー", color=def_color)
+    embed_info = discord.Embed(color=info_color)
 
-    await ctx.respond(embed=embed)
+    embed_atk.description = "\n".join([p[0] for p in teamA])
+    embed_def.description = "\n".join([p[0] for p in teamB])
+    embed_info.description = f"組み合わせ候補：{idx}/{total}"
+
+    # Embed3つで送信
+    await ctx.respond(embeds=[embed_atk, embed_def, embed_info])
 
 
-# Botにコマンドグループ登録
+# コマンド登録
 bot.add_application_command(peko)
 
 
