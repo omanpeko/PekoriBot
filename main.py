@@ -26,7 +26,7 @@ GUILD_IDS = [1357655899212349490]
 main_color = discord.Color.from_rgb(255, 140, 0)  # オレンジ
 
 # ---- Google Apps Script URL ----
-GAS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbyjOtoYq8zeOfA-ph9GzdUWJmGONWF0N9UNk6RffHbi6XDki58LEmFzfIZpMWkV6X1hrQ/exec"
+GAS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbztYZmisYPC_BbyY-lNG296sIQHZBo_iu1xMcf8M_5_QJX7DGUNcz5Z2HP2gWgW-RvvEg/exec"
 
 # ---- ランクポイント辞書 ----
 RANK_POINTS = {
