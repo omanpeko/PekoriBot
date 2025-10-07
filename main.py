@@ -22,14 +22,16 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 GUILD_IDS = [1357655899212349490]
 
 # ---- カラー設定 ----
-main_color = discord.Color.from_rgb(255, 140, 0)
+main_color = discord.Color.from_rgb(255, 140, 0)  # オレンジ
 
-# ---- GAS Webhook ----
+# ---- GAS Webhook URL ----
 GAS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbztYZmisYPC_BbyY-lNG296sIQHZBo_iu1xMcf8M_5_QJX7DGUNcz5Z2HP2gWgW-RvvEg/exec"
 
 
-# ---- ランク表記変換 ----
-def normalize_rank(input_rank: str) -> str:
+# ============================================================
+#  ランク表記変換（全角・半角・英語・略称・誤字対応）
+# ============================================================
+def normalize_rank(input_rank: str) -> str | None:
     text = input_rank.strip().lower()
     text = text.replace("　", "").replace(" ", "")
 
@@ -45,13 +47,9 @@ def normalize_rank(input_rank: str) -> str:
         "radiant": "レディアント", "れでぃ": "レディアント", "レディ": "レディアント",
     }
 
-    num_map = {
-        "1": "1", "１": "1",
-        "2": "2", "２": "2",
-        "3": "3", "３": "3",
-    }
-
+    num_map = {"1": "1", "１": "1", "2": "2", "２": "2", "3": "3", "３": "3"}
     num = "1"
+
     for k, v in num_map.items():
         if text.endswith(k):
             num = v
@@ -60,14 +58,16 @@ def normalize_rank(input_rank: str) -> str:
 
     rank_name = next((v for k, v in table.items() if k in text), None)
     if not rank_name:
-        return input_rank  # 不明ならそのまま返す
+        return None  # ❌ ランクに該当しない場合
 
     if rank_name == "レディアント":
         return rank_name
     return f"{rank_name}{num}"
 
 
-# ---- チーム分けアルゴリズム ----
+# ============================================================
+#  チーム分けアルゴリズム（偶数・奇数どちらでもOK）
+# ============================================================
 def split_balanced_teams(players):
     n = len(players)
     best_diff = 999
@@ -86,13 +86,15 @@ def split_balanced_teams(players):
     return best_pair[0], best_pair[1], best_diff
 
 
-# ---- /peko グループ ----
+# ============================================================
+#  スラッシュコマンドグループ
+# ============================================================
 peko = SlashCommandGroup("peko", "PekoriBotのコマンド群", guild_ids=GUILD_IDS)
 
 
-# ===========================
-# 🟧 /peko rank
-# ===========================
+# ===============================
+# /peko rank
+# ===============================
 @peko.command(name="rank", description="自分のランクを登録します（例：ゴールド2 / gold2 / ダイヤ3 / ase1 など）")
 async def rank(ctx, rank: str):
     user = ctx.author
@@ -101,6 +103,14 @@ async def rank(ctx, rank: str):
     avatar_url = user.display_avatar.url
 
     matched_rank = normalize_rank(rank)
+
+    # ❌ 無効なランクの場合
+    if not matched_rank:
+        await ctx.respond(
+            f"⚠️ **{rank}** は有効なランクとして認識できませんでした。\n"
+            "例：`ゴールド2` / `gold2` / `ダイヤ3` / `ase1` などの形式で入力してください。"
+        )
+        return
 
     payload = {
         "action": "add",
@@ -116,16 +126,16 @@ async def rank(ctx, rank: str):
             text = await resp.text()
 
     if "ADDED" in text:
-        await ctx.respond(f"✅ {username} さんを **{matched_rank}** で登録しました！")
+        await ctx.followup.send(f"✅ {username} さんを **{matched_rank}** で登録しました！")
     elif "UPDATED" in text:
-        await ctx.respond(f"🔁 {username} さんのランクを **{matched_rank}** に更新しました！")
+        await ctx.followup.send(f"🔁 {username} さんのランクを **{matched_rank}** に更新しました！")
     else:
-        await ctx.respond(f"⚠️ 登録に失敗しました（{text}）")
+        await ctx.followup.send(f"⚠️ 登録に失敗しました（{text}）")
 
 
-# ===========================
-# 🟥 /peko remove
-# ===========================
+# ===============================
+# /peko remove
+# ===============================
 @peko.command(name="remove", description="登録データを削除します")
 async def remove(ctx):
     user = ctx.author
@@ -143,9 +153,9 @@ async def remove(ctx):
         await ctx.respond(f"⚠️ 削除処理に失敗しました（{text}）")
 
 
-# ===========================
-# ✏️ /peko rename
-# ===========================
+# ===============================
+# /peko rename
+# ===============================
 @peko.command(name="rename", description="スプレッドシート上のニックネームを変更します")
 async def rename(ctx, new_name: str):
     user = ctx.author
@@ -163,9 +173,9 @@ async def rename(ctx, new_name: str):
         await ctx.respond(f"⚠️ 変更に失敗しました（{text}）")
 
 
-# ===========================
-# 🎮 /peko team
-# ===========================
+# ===============================
+# /peko team
+# ===============================
 @peko.command(name="team", description="VC内メンバーをチーム分けします")
 async def team(ctx):
     if not ctx.author.voice or not ctx.author.voice.channel:
@@ -177,7 +187,6 @@ async def team(ctx):
         await ctx.respond("⚠️ 2人以上で実行してください。")
         return
 
-    # 💡 処理が長いので defer
     await ctx.defer()
 
     user_ids = [str(m.id) for m in members]
@@ -190,12 +199,24 @@ async def team(ctx):
                 return
             data = await resp.json()
 
-    if not data:
-        await ctx.followup.send("⚠️ スプレッドシートに登録されたランク情報が見つかりません。")
+    if not isinstance(data, list):
+        await ctx.followup.send(f"⚠️ データ取得エラー: {data}")
         return
 
-    registered = [d for d in data if int(d.get("point", 0)) > 0]
-    registered_ids = {str(d.get("user_id")) for d in registered}
+    # IDを文字列で統一
+    registered = []
+    for d in data:
+        try:
+            registered.append({
+                "user_id": str(d.get("user_id")),
+                "name": d.get("name", "不明"),
+                "rank": d.get("rank", "不明"),
+                "point": int(d.get("point", 0))
+            })
+        except Exception as e:
+            logging.warning(f"Invalid entry: {d} ({e})")
+
+    registered_ids = {p["user_id"] for p in registered}
     unregistered = [m.display_name for m in members if str(m.id) not in registered_ids]
 
     if unregistered:
@@ -218,16 +239,15 @@ async def team(ctx):
     )
     embed.add_field(name="　", value=f"チーム差：{diff}", inline=False)
 
-    # deferしたら followup.send を使う
     await ctx.followup.send(embed=embed)
-
-
 
 
 bot.add_application_command(peko)
 
 
-# ---- 起動 ----
+# ===============================
+# 起動処理
+# ===============================
 @bot.event
 async def on_ready():
     await bot.change_presence(activity=discord.Game(name="/peko rank, team, etc"))
