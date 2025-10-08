@@ -8,6 +8,7 @@ import aiohttp
 import discord
 from discord.ext import commands
 from discord.commands import SlashCommandGroup, Option
+from google_slide import generate_team_image  # ← ここが新規追加！
 
 logging.basicConfig(level=logging.INFO)
 
@@ -137,7 +138,7 @@ peko = SlashCommandGroup("peko", "PekoriBotのコマンド群", guild_ids=GUILD_
 
 
 # ============================================================
-# 🏅 /peko rank（入力欄付き）
+# 🏅 /peko rank
 # ============================================================
 @peko.command(name="rank", description="自分のランクを登録（例：ゴールド2 / gold2 / ase1）")
 async def rank(
@@ -212,30 +213,7 @@ async def rank(
 
 
 # ============================================================
-# 🗑️ /peko remove
-# ============================================================
-@peko.command(name="remove", description="自分のランク登録データを削除します")
-async def remove(ctx):
-    await ctx.defer()
-    user = ctx.author
-    user_id = str(user.id)
-
-    payload = {"action": "remove", "user_id": user_id}
-
-    async with aiohttp.ClientSession() as session:
-        async with session.post(GAS_WEBHOOK_URL, json=payload) as response:
-            text = await response.text()
-            if "REMOVED" in text:
-                msg = f"🗑️ {user.display_name} さんの登録データを削除しました。"
-            elif "NOT_FOUND" in text:
-                msg = f"⚠️ {user.display_name} さんの登録データは見つかりませんでした。"
-            else:
-                msg = f"⚠️ 削除処理に失敗しました（{response.status}）"
-            await ctx.followup.send(msg)
-
-
-# ============================================================
-# 🎮 /peko team（VC内メンバーをチーム分け）
+# 🎮 /peko team
 # ============================================================
 @peko.command(name="team", description="VC内メンバーをランクデータからチーム分けします")
 async def team(ctx):
@@ -295,9 +273,20 @@ async def team(ctx):
     embed.add_field(name="　", value=f"組み合わせ候補：{idx}/{total}", inline=False)
     await ctx.followup.send(embed=embed)
 
+    # ---- チーム画像生成（Google Slides連携）----
+    image_url = await generate_team_image([
+        {"name": p[0], "iconUrl": f"https://raw.githubusercontent.com/omanpeko/PekoriBot/main/icon_img/{p[3]}.jpg"}
+        for p in (teamA + teamB)
+    ])
+
+    if image_url:
+        await ctx.followup.send(f"📸 チーム画像が完成しました！\n{image_url}")
+    else:
+        await ctx.followup.send("⚠️ チーム画像の生成に失敗しました。")
+
 
 # ============================================================
-# 🧪 /peko teamtest（固定10人）
+# 🧪 /peko teamtest
 # ============================================================
 @peko.command(name="teamtest", description="VC不要・固定10人でチーム分けテスト")
 async def teamtest(ctx):
@@ -324,10 +313,6 @@ async def teamtest(ctx):
         point = RANK_POINTS.get(rank, 0)
         players.append((name, rank, point, d.get("user_id")))
 
-    if len(players) < 2:
-        await ctx.followup.send("⚠️ テスト対象が2人未満です。")
-        return
-
     guild = ctx.guild
     emoji_dict = {e.name: e for e in guild.emojis}
 
@@ -345,6 +330,16 @@ async def teamtest(ctx):
     embed.add_field(name="　", value=f"組み合わせ候補：{idx}/{total}", inline=False)
     await ctx.followup.send(embed=embed)
 
+    image_url = await generate_team_image([
+        {"name": p[0], "iconUrl": f"https://raw.githubusercontent.com/omanpeko/PekoriBot/main/icon_img/{p[3]}.jpg"}
+        for p in (teamA + teamB)
+    ])
+
+    if image_url:
+        await ctx.followup.send(f"📸 チーム画像が完成しました！\n{image_url}")
+    else:
+        await ctx.followup.send("⚠️ チーム画像の生成に失敗しました。")
+
 
 # ============================================================
 # 🚀 起動時処理
@@ -355,8 +350,9 @@ bot.add_application_command(peko)
 async def on_ready():
     await bot.sync_commands()
     logging.info(f"✅ コマンド同期完了: {len(bot.application_commands)} 件")
-    await bot.change_presence(activity=discord.Game(name="/peko rank / team / teamtest"))
+    await bot.change_presence(activity=discord.Game(name="PekoriBot v1.1"))
     logging.info(f"✅ Logged in as {bot.user} (id: {bot.user.id})")
+
 
 if __name__ == "__main__":
     token = os.getenv("DISCORD_TOKEN", "").strip().strip('"').strip("'")
