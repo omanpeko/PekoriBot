@@ -12,6 +12,10 @@ import discord
 from discord.ext import commands
 from discord.commands import SlashCommandGroup, Option
 
+# firebase 設定
+import firebase_admin
+from firebase_admin import credentials, firestore
+
 CUSTOM_EMOJIS = {} 
 
 logging.basicConfig(level=logging.INFO)
@@ -236,6 +240,9 @@ async def process_team_result(ctx, data):
     powerA = sum(p[2] for p in teamA)
     powerB = sum(p[2] for p in teamB)
 
+    # Firebaseにチーム結果を送信
+    save_team_to_firestore(teamA, teamB)
+
     # =============================
     # Embed生成（チーム結果）
     # =============================
@@ -320,6 +327,51 @@ async def teamtest(ctx):
 
     # ✅ チーム処理（共通関数）
     await process_team_result(ctx, data)
+
+
+# ============================================================
+# 🔥 Firestore 初期化
+# ============================================================
+cred = credentials.Certificate("serviceAccountKey.json")  # サービスアカウントキー
+firebase_admin.initialize_app(cred)
+db = firestore.client()
+
+# ============================================================
+# 🧩 チームデータ書き込み関数
+# ============================================================
+def save_team_to_firestore(team_a, team_b):
+    """チーム分け結果を Firestore に保存"""
+
+    doc_ref = db.collection("TwitchChatDatabase").document("VALORANTteam")
+
+    # --- 既存のアタッカー/ディフェンダー削除（毎回上書き用） ---
+    attackers_ref = doc_ref.collection("アタッカー")
+    defenders_ref = doc_ref.collection("ディフェンダー")
+
+    # 全削除（上書き更新したい場合）
+    for col in [attackers_ref, defenders_ref]:
+        for doc in col.stream():
+            col.document(doc.id).delete()
+
+    # --- アタッカー保存 ---
+    for i, player in enumerate(team_a, start=1):
+        attackers_ref.document(f"player{i}").set({
+            "name": player["name"],
+            "rank": player["rank"],
+            "icon": player["icon"],
+            "rankImg": player["rank_img"]
+        })
+
+    # --- ディフェンダー保存 ---
+    for i, player in enumerate(team_b, start=1):
+        defenders_ref.document(f"player{i}").set({
+            "name": player["name"],
+            "rank": player["rank"],
+            "icon": player["icon"],
+            "rankImg": player["rank_img"]
+        })
+
+    print("✅ Firestoreにチームデータを保存しました！")
 
 # ============================================================
 # 🚀 起動
