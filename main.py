@@ -264,7 +264,7 @@ async def process_team_result(ctx, data):
 
 
     # =============================
-    # 
+    # 🧩 ランク日本語→英語変換関数
     # =============================
     def rank_to_eng(rank_name: str) -> str:
         rank_map = {
