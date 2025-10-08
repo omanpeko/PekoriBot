@@ -326,6 +326,18 @@ async def team(ctx):
 
     await ctx.defer()
     user_ids = [str(m.id) for m in members]
+
+    payload = {"action": "fetch_team_data", "user_ids": user_ids}
+
+    async with aiohttp.ClientSession() as session:
+        async with session.post(GAS_RANK_URL, json=payload) as r:
+            try:
+                data = await r.json()
+            except Exception as e:
+                text = await r.text()
+                await ctx.followup.send(f"⚠️ JSON変換失敗: {e}\n{text}")
+                return
+
     await process_team_result(ctx, data)
 
 # ============================================================
