@@ -332,46 +332,38 @@ async def teamtest(ctx):
 # ============================================================
 # 🔥 Firestore 初期化
 # ============================================================
-cred = credentials.Certificate("serviceAccountKey.json")  # サービスアカウントキー
+cred = credentials.Certificate("twitchchatdatabase-firebase-adminsdk-fbsvc-5a18cc4225.json")  # 秘密鍵ファイル
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 
 # ============================================================
 # 🧩 チームデータ書き込み関数
 # ============================================================
-def save_team_to_firestore(team_a, team_b):
-    """チーム分け結果を Firestore に保存"""
-
+def save_team_to_firestore(teamA, teamB):
+    """Discordチーム分け結果を Firestore に保存"""
     doc_ref = db.collection("TwitchChatDatabase").document("VALORANTteam")
 
-    # --- 既存のアタッカー/ディフェンダー削除（毎回上書き用） ---
-    attackers_ref = doc_ref.collection("アタッカー")
-    defenders_ref = doc_ref.collection("ディフェンダー")
+    # 一旦削除してリセット
+    for col_name in ["アタッカー", "ディフェンダー"]:
+        col_ref = doc_ref.collection(col_name)
+        for doc in col_ref.stream():
+            col_ref.document(doc.id).delete()
 
-    # 全削除（上書き更新したい場合）
-    for col in [attackers_ref, defenders_ref]:
-        for doc in col.stream():
-            col.document(doc.id).delete()
+    # 保存処理
+    def save_team(collection_name, team):
+        col_ref = doc_ref.collection(collection_name)
+        for i, p in enumerate(team, start=1):
+            col_ref.document(f"player{i}").set({
+                "name": p["name"],
+                "rank": p["rank"],
+                "icon": p["icon"],
+                "rankImg": f"https://raw.githubusercontent.com/omanpeko/PekoriBot/main/rank_img/{p['rank_img']}.png"
+            })
 
-    # --- アタッカー保存 ---
-    for i, player in enumerate(team_a, start=1):
-        attackers_ref.document(f"player{i}").set({
-            "name": player["name"],
-            "rank": player["rank"],
-            "icon": player["icon"],
-            "rankImg": player["rank_img"]
-        })
+    save_team("アタッカー", teamA)
+    save_team("ディフェンダー", teamB)
 
-    # --- ディフェンダー保存 ---
-    for i, player in enumerate(team_b, start=1):
-        defenders_ref.document(f"player{i}").set({
-            "name": player["name"],
-            "rank": player["rank"],
-            "icon": player["icon"],
-            "rankImg": player["rank_img"]
-        })
-
-    print("✅ Firestoreにチームデータを保存しました！")
+    print("✅ VALORANTteam データを Firestore に保存しました。")
 
 # ============================================================
 # 🚀 起動
