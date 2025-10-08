@@ -129,6 +129,19 @@ def get_rank_emoji(rank_name: str, emoji_dict: dict) -> str:
     # 🔥 str(emoji) で登録されてるので、これが直接 <::>形式で返る！
     return emoji_dict.get(emoji_key, rank_name)
 
+# =============================
+# 🧩 ランク日本語→英語変換関数
+# =============================
+def rank_to_eng(rank_name: str) -> str:
+    rank_map = {
+        "アイアン": "Iron", "ブロンズ": "Bronze", "シルバー": "Silver",
+        "ゴールド": "Gold", "プラチナ": "Platinum", "ダイヤモンド": "Diamond",
+        "アセンダント": "Ascendant", "イモータル": "Immortal", "レディアント": "Radiant"
+    }
+    base = re.sub(r"\d", "", rank_name)
+    num = re.sub(r"\D", "", rank_name)
+    return f"{rank_map.get(base, 'Unknown')}{num}"
+
 
 # ============================================================
 # 🧩 コマンドグループ
@@ -261,20 +274,6 @@ async def process_team_result(ctx, data):
     )
     embed.add_field(name="　", value=f"組み合わせ候補：{idx}/{total}", inline=False)
     await ctx.followup.send(embed=embed)
-
-
-    # =============================
-    # 🧩 ランク日本語→英語変換関数
-    # =============================
-    def rank_to_eng(rank_name: str) -> str:
-        rank_map = {
-            "アイアン": "Iron", "ブロンズ": "Bronze", "シルバー": "Silver",
-            "ゴールド": "Gold", "プラチナ": "Platinum", "ダイヤモンド": "Diamond",
-            "アセンダント": "Ascendant", "イモータル": "Immortal", "レディアント": "Radiant"
-        }
-        base = re.sub(r"\d", "", rank_name)
-        num = re.sub(r"\D", "", rank_name)
-        return f"{rank_map.get(base, 'Unknown')}{num}"
 
     # =============================
     # データを成型
