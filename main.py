@@ -11,14 +11,16 @@ from discord.commands import SlashCommandGroup
 
 logging.basicConfig(level=logging.INFO)
 
-# ---- Discord設定 ----
+# ============================================================
+# ⚙️ Discord Bot 設定
+# ============================================================
 intents = discord.Intents.default()
 intents.message_content = True
 intents.voice_states = True
 intents.members = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# ---- サーバーID ----
+# ---- サーバーID（複数対応） ----
 GUILD_IDS = [
     1357655899212349490,  # あなたのサーバー
     932269784228306995,   # CYNTHIA
@@ -43,10 +45,12 @@ PLAYER_IDS = [
 # ---- カラー設定 ----
 main_color = discord.Color.from_rgb(255, 140, 0)
 
-# ---- GAS URL ----
+# ---- GAS Webhook URL ----
 GAS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbztYZmisYPC_BbyY-lNG296sIQHZBo_iu1xMcf8M_5_QJX7DGUNcz5Z2HP2gWgW-RvvEg/exec"
 
-# ---- ランクポイント ----
+# ============================================================
+# 🧮 ランクデータ
+# ============================================================
 RANK_POINTS = {
     "アイアン1": 1, "アイアン2": 2, "アイアン3": 3,
     "ブロンズ1": 4, "ブロンズ2": 5, "ブロンズ3": 6,
@@ -61,13 +65,13 @@ RANK_POINTS = {
 
 
 # ============================================================
-# 🧮 チーム分けアルゴリズム（戦力差を段階的に緩和）
+# 🎲 チーム分けアルゴリズム（戦力差1から順に緩和）
 # ============================================================
 def generate_balanced_teams(players):
     all_combos = list(itertools.combinations(range(len(players)), len(players)//2))
     seen = set()
 
-    for max_diff in range(1, 999):  # 1以下から順に緩和
+    for max_diff in range(1, 999):  # 1から緩和
         valid_combinations = []
         for combo in all_combos:
             complement = tuple(sorted(set(range(len(players))) - set(combo)))
@@ -97,38 +101,26 @@ def generate_balanced_teams(players):
 
 
 # ============================================================
-# 🧩 スラッシュコマンド
+# 🧩 スラッシュコマンド登録
 # ============================================================
 peko = SlashCommandGroup("peko", "PekoriBotのコマンド群", guild_ids=GUILD_IDS)
 
 
-# ✅ ランク登録（自由入力対応版）
-@peko.command(name="rank", description="自分のランクを登録（例：/peko rank ゴールド２）")
-async def rank(ctx):
+# ============================================================
+# 🏅 /peko rank
+# ============================================================
+@peko.command(name="rank", description="自分のランクを登録（例：ゴールド2 / gold2 / ase1）")
+@discord.option(
+    "rank_name",
+    description="ランク名を入力（例：ゴールド2 / gold2 / ダイヤモンド3 / ase1 など）",
+    required=True
+)
+async def rank(ctx, rank_name: str):
     await ctx.defer()
     user = ctx.author
     avatar_url = user.display_avatar.url
     username = user.display_name
     user_id = str(user.id)
-
-    # ---- 入力取得 ----
-    text_value = None
-    if ctx.interaction.data.get("options"):
-        text_value = ctx.interaction.data["options"][0]["value"]
-
-    if not text_value:
-        raw = ctx.interaction.data.get("name") or ""
-        if raw == "rank" and " " in ctx.interaction.data.get("command_name", ""):
-            text_value = ctx.interaction.data.get("command_name").split(" ", 1)[1]
-        else:
-            data = ctx.interaction.data
-            text_value = data.get("custom_id", "") or ""
-
-    if not text_value:
-        await ctx.followup.send("⚠️ ランクを入力してください（例：`/peko rank ゴールド2`）")
-        return
-
-    rank_name = text_value.strip()
 
     # ---- 整形・変換 ----
     input_text = rank_name.strip().lower().replace("　", "").replace(" ", "")
@@ -187,7 +179,32 @@ async def rank(ctx):
                 await ctx.followup.send(f"⚠️ 登録に失敗しました（{response.status}）")
 
 
-# 🎮 通常チーム分け（VC参照）
+# ============================================================
+# 🗑️ /peko remove
+# ============================================================
+@peko.command(name="remove", description="自分のランク登録データを削除します")
+async def remove(ctx):
+    await ctx.defer()
+    user = ctx.author
+    user_id = str(user.id)
+
+    payload = {"action": "remove", "user_id": user_id}
+
+    async with aiohttp.ClientSession() as session:
+        async with session.post(GAS_WEBHOOK_URL, json=payload) as response:
+            text = await response.text()
+            if "REMOVED" in text:
+                msg = f"🗑️ {user.display_name} さんの登録データを削除しました。"
+            elif "NOT_FOUND" in text:
+                msg = f"⚠️ {user.display_name} さんの登録データは見つかりませんでした。"
+            else:
+                msg = f"⚠️ 削除処理に失敗しました（{response.status}）"
+            await ctx.followup.send(msg)
+
+
+# ============================================================
+# 🎮 /peko team（VC内メンバーをチーム分け）
+# ============================================================
 @peko.command(name="team", description="VC内メンバーをランクデータからチーム分けします")
 async def team(ctx):
     if not ctx.author.voice or not ctx.author.voice.channel:
@@ -244,7 +261,9 @@ async def team(ctx):
     await ctx.followup.send(embed=embed)
 
 
-# 🧪 チームテスト（VC不要・強制実行）
+# ============================================================
+# 🧪 /peko teamtest（VC不要のテスト用）
+# ============================================================
 @peko.command(name="teamtest", description="VCに参加せず固定リストから10人をチーム分けします")
 async def teamtest(ctx):
     await ctx.defer()
@@ -270,7 +289,6 @@ async def teamtest(ctx):
         point = RANK_POINTS.get(rank, 0)
         players.append((name, rank, point, d.get("user_id")))
 
-    # ✅ VCチェックをスキップして強制チーム分け
     if len(players) < 2:
         await ctx.followup.send("⚠️ テスト対象が2人未満です。")
         return
@@ -291,7 +309,7 @@ async def teamtest(ctx):
 
 
 # ============================================================
-# 起動イベント
+# 🚀 起動処理
 # ============================================================
 bot.add_application_command(peko)
 
