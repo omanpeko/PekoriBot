@@ -345,8 +345,8 @@ async def load_custom_emojis():
     global CUSTOM_EMOJIS
     CUSTOM_EMOJIS.clear()
 
-    # 少し待ってから（ギルド情報同期を安定させる）
-    await discord.utils.sleep_until(discord.utils.utcnow() + discord.utils.timedelta(seconds=3))
+    # 🎵 ギルド情報同期が完了するまで少し待機
+    await asyncio.sleep(3)
 
     emoji_count = 0
     for guild in bot.guilds:
