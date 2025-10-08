@@ -263,9 +263,9 @@ async def process_team_result(ctx, data):
     }
     async with aiohttp.ClientSession() as session:
         async with session.post(GAS_SLIDE_URL, json=payload2) as r2:
-            text = await r2.text()  # ←ここ変更
+            text = await r2.text()
             try:
-                result = json.loads(text)  # ←ここ追加
+                result = json.loads(text)
                 image_url = result.get("url")
                 if image_url:
                     img_embed = discord.Embed(color=main_color)
