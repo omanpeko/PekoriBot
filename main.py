@@ -104,13 +104,19 @@ def generate_balanced_teams(players):
 # ============================================================
 @bot.event
 async def on_ready():
+    global CUSTOM_EMOJIS
     CUSTOM_EMOJIS.clear()
+
+    # --- 全サーバーの絵文字をキャッシュ ---
     for guild in bot.guilds:
         for emoji in guild.emojis:
             CUSTOM_EMOJIS[emoji.name.lower()] = f"<:{emoji.name}:{emoji.id}>"
-    await bot.sync_commands()
+
     logging.info(f"✅ カスタム絵文字読み込み完了: {len(CUSTOM_EMOJIS)}個")
+    await bot.sync_commands()
     await bot.change_presence(activity=discord.Game(name="/peko rank / team / teamtest / remove"))
+    logging.info(f"✅ ログイン完了: {bot.user} ({bot.user.id})")
+
 
 def get_rank_emoji(rank_name: str, emoji_dict: dict) -> str:
     if not rank_name:
