@@ -256,16 +256,23 @@ async def process_team_result(ctx, data):
     # =============================
     # Embed生成（チーム結果）
     # =============================
-desc = "**🟥 アタッカー**\n" + "\n".join(
-    [f"{get_rank_emoji(p[1], CUSTOM_EMOJIS)} {p[0]}" for p in teamA]
-)
-desc += f"\n\n**🟦 ディフェンダー**\n" + "\n".join(
-    [f"{get_rank_emoji(p[1], CUSTOM_EMOJIS)} {p[0]}" for p in teamB]
-)
-
-embed = discord.Embed(title="チーム分け結果", description=desc, color=main_color)
-await ctx.followup.send(embed=embed)
-
+    embed = discord.Embed(title="チーム分け結果", color=main_color)
+    embed.add_field(
+        name="🟥 アタッカー",
+        value="\n".join(
+            [f"{get_rank_emoji(p[1], CUSTOM_EMOJIS)} {p[0]}" for p in teamA]
+        ) + f"\nポイント：{powerA}",
+        inline=True,
+    )
+    embed.add_field(
+        name="🟦 ディフェンダー",
+        value="\n".join(
+            [f"{get_rank_emoji(p[1], CUSTOM_EMOJIS)} {p[0]}" for p in teamB]
+        ) + f"\nポイント：{powerB}",
+        inline=True,
+    )
+    embed.add_field(name="　", value=f"組み合わせ候補：{idx}/{total}", inline=False)
+    await ctx.followup.send(embed=embed)
 
     # =============================
     # GASスライド生成（画像URL取得）
