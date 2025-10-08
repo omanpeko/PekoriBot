@@ -1,1 +1,4 @@
 py-cord==2.5.0
+discord.py
+aiohttp
+firebase-admin
