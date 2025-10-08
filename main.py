@@ -294,7 +294,7 @@ async def team(ctx):
 
     await ctx.defer()
     user_ids = [str(m.id) for m in members]
-    await process_team(ctx, user_ids, "チーム分け結果")
+    await process_team_result(ctx, user_ids, "チーム分け結果")
 
 # ============================================================
 # 🧪 /peko teamtest
@@ -303,7 +303,7 @@ async def team(ctx):
 async def teamtest(ctx):
     await ctx.defer()
     user_ids = [str(i) for i in PLAYER_IDS]
-    await process_team(ctx, user_ids, "チーム分けテスト結果")
+    await process_team_result(ctx, user_ids, "チーム分けテスト結果")
 
 # ============================================================
 # 🚀 起動
