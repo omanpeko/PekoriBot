@@ -102,20 +102,6 @@ def generate_balanced_teams(players):
 # ============================================================
 # 🧩 カスタム絵文字でランク表示
 # ============================================================
-@bot.event
-async def on_ready():
-    global CUSTOM_EMOJIS
-    CUSTOM_EMOJIS.clear()
-
-    # 旧バージョンと同じキャッシュ形式に戻す
-    for guild in bot.guilds:
-        for emoji in guild.emojis:
-            CUSTOM_EMOJIS[emoji.name.lower()] = str(emoji)
-
-    await bot.sync_commands()
-    await bot.change_presence(activity=discord.Game(name="/peko rank / team / teamtest / remove"))
-    logging.info(f"✅ カスタム絵文字読み込み完了: {len(CUSTOM_EMOJIS)}個")
-
 def get_rank_emoji(rank_name: str, emoji_dict: dict) -> str:
     if not rank_name:
         return ""
@@ -341,13 +327,25 @@ bot.add_application_command(peko)
 
 @bot.event
 async def on_ready():
+    global CUSTOM_EMOJIS
+    CUSTOM_EMOJIS = {}
+
+    # =====================================================
+    # 🎨 カスタム絵文字読み込み
+    # =====================================================
+    emoji_count = 0
+    for guild in bot.guilds:
+        logging.info(f"🧩 ギルド読込中: {guild.name}")
+        for emoji in guild.emojis:
+            CUSTOM_EMOJIS[emoji.name.lower()] = str(emoji)
+            emoji_count += 1
+    logging.info(f"✅ カスタム絵文字読み込み完了: {emoji_count}個")
+
+    # =====================================================
+    # ⚙️ コマンド同期 & ステータス設定
+    # =====================================================
     await bot.sync_commands()
     logging.info("✅ PekoriBot v1.5 コマンド同期完了")
+
     await bot.change_presence(activity=discord.Game(name="/peko rank / team / teamtest / remove"))
     logging.info(f"✅ ログイン完了: {bot.user} ({bot.user.id})")
-
-if __name__ == "__main__":
-    token = os.getenv("DISCORD_TOKEN", "").strip().strip('"').strip("'")
-    if not token:
-        raise RuntimeError("DISCORD_TOKEN が未設定です。")
-    bot.run(token)
