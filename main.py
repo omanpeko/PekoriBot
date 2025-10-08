@@ -59,6 +59,7 @@ RANK_POINTS = {
     "レディアント": 25
 }
 
+
 # ============================================================
 # 🧮 チーム分けアルゴリズム（戦力差を段階的に緩和）
 # ============================================================
@@ -101,7 +102,7 @@ def generate_balanced_teams(players):
 peko = SlashCommandGroup("peko", "PekoriBotのコマンド群", guild_ids=GUILD_IDS)
 
 
-# ✅ ランク登録
+# ✅ ランク登録（自由入力対応版）
 @peko.command(name="rank", description="自分のランクを登録（例：/peko rank ゴールド２）")
 async def rank(ctx):
     await ctx.defer()
@@ -110,16 +111,31 @@ async def rank(ctx):
     username = user.display_name
     user_id = str(user.id)
 
-    full_text = ctx.interaction.data.get("options")
-    if not full_text:
+    # ---- 入力取得 ----
+    text_value = None
+    if ctx.interaction.data.get("options"):
+        text_value = ctx.interaction.data["options"][0]["value"]
+
+    if not text_value:
+        raw = ctx.interaction.data.get("name") or ""
+        if raw == "rank" and " " in ctx.interaction.data.get("command_name", ""):
+            text_value = ctx.interaction.data.get("command_name").split(" ", 1)[1]
+        else:
+            data = ctx.interaction.data
+            text_value = data.get("custom_id", "") or ""
+
+    if not text_value:
         await ctx.followup.send("⚠️ ランクを入力してください（例：`/peko rank ゴールド2`）")
         return
-    rank_name = full_text[0]["value"]
 
+    rank_name = text_value.strip()
+
+    # ---- 整形・変換 ----
     input_text = rank_name.strip().lower().replace("　", "").replace(" ", "")
     input_text = re.sub(r"[０-９]", lambda m: chr(ord(m.group(0)) - 65248), input_text)
     input_text = re.sub(r"(\d+)", lambda m: str(int(m.group(1))), input_text)
 
+    # ---- ランク表記ゆれ ----
     matched_rank = None
     RANK_NORMALIZE = {
         r"^(iron|あいあん|アイアン)": "アイアン",
@@ -147,6 +163,7 @@ async def rank(ctx):
         )
         return
 
+    # ---- GASへ送信 ----
     payload = {
         "action": "add",
         "username": username,
@@ -170,28 +187,7 @@ async def rank(ctx):
                 await ctx.followup.send(f"⚠️ 登録に失敗しました（{response.status}）")
 
 
-# 🗑️ 登録削除
-@peko.command(name="remove", description="自分のランク登録データを削除します")
-async def remove(ctx):
-    await ctx.defer()
-    user = ctx.author
-    user_id = str(user.id)
-
-    payload = {"action": "remove", "user_id": user_id}
-
-    async with aiohttp.ClientSession() as session:
-        async with session.post(GAS_WEBHOOK_URL, json=payload) as response:
-            text = await response.text()
-            if "REMOVED" in text:
-                msg = f"🗑️ {user.display_name} さんの登録データを削除しました。"
-            elif "NOT_FOUND" in text:
-                msg = f"⚠️ {user.display_name} さんの登録データは見つかりませんでした。"
-            else:
-                msg = f"⚠️ 削除処理に失敗しました（{response.status}）"
-            await ctx.followup.send(msg)
-
-
-# 🎮 チーム分け（VCベース）
+# 🎮 通常チーム分け（VC参照）
 @peko.command(name="team", description="VC内メンバーをランクデータからチーム分けします")
 async def team(ctx):
     if not ctx.author.voice or not ctx.author.voice.channel:
@@ -245,12 +241,11 @@ async def team(ctx):
     embed.add_field(name="🟥 アタッカー＿＿＿＿", value="\n".join([f"{p[0]} ({p[1]})" for p in teamA]) + f"\n戦力：{powerA}", inline=True)
     embed.add_field(name="🟦 ディフェンダー", value="\n".join([f"{p[0]} ({p[1]})" for p in teamB]) + f"\n戦力：{powerB}", inline=True)
     embed.add_field(name="　", value=f"組み合わせ候補：{idx}/{total}", inline=False)
-
     await ctx.followup.send(embed=embed)
 
 
-# 🧪 チームテスト（固定データ）
-@peko.command(name="teamtest", description="固定リストの10人を使ってチーム分けをテストします")
+# 🧪 チームテスト（VC不要・強制実行）
+@peko.command(name="teamtest", description="VCに参加せず固定リストから10人をチーム分けします")
 async def teamtest(ctx):
     await ctx.defer()
 
@@ -264,12 +259,21 @@ async def teamtest(ctx):
                 return
             data = await resp.json()
 
+    if not isinstance(data, list):
+        await ctx.followup.send(f"⚠️ データ取得エラー: {data}")
+        return
+
     players = []
     for d in data:
         name = d.get("name", "不明")
         rank = d.get("rank", "不明")
         point = RANK_POINTS.get(rank, 0)
         players.append((name, rank, point, d.get("user_id")))
+
+    # ✅ VCチェックをスキップして強制チーム分け
+    if len(players) < 2:
+        await ctx.followup.send("⚠️ テスト対象が2人未満です。")
+        return
 
     teamA, teamB, diff, idx, total = generate_balanced_teams(players)
     if not teamA:
@@ -283,7 +287,6 @@ async def teamtest(ctx):
     embed.add_field(name="🟥 アタッカー＿＿＿＿", value="\n".join([f"{p[0]} ({p[1]})" for p in teamA]) + f"\n戦力：{powerA}", inline=True)
     embed.add_field(name="🟦 ディフェンダー", value="\n".join([f"{p[0]} ({p[1]})" for p in teamB]) + f"\n戦力：{powerB}", inline=True)
     embed.add_field(name="　", value=f"組み合わせ候補：{idx}/{total}", inline=False)
-
     await ctx.followup.send(embed=embed)
 
 
