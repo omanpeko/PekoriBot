@@ -259,8 +259,8 @@ async def process_team_result(ctx, data):
     # =============================
     payload2 = {
         "action": "update_slide",
-        "teamA": [{"name": p[0], "icon": p[3]} for p in teamA],
-        "teamB": [{"name": p[0], "icon": p[3]} for p in teamB],
+        "teamA": [{"name": p[0], "icon": p[3], "rank": p[1]} for p in teamA],
+        "teamB": [{"name": p[0], "icon": p[3], "rank": p[1]} for p in teamB],
     }
     async with aiohttp.ClientSession() as session:
         async with session.post(GAS_SLIDE_URL, json=payload2) as r2:
