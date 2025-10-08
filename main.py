@@ -319,7 +319,7 @@ async def teamtest(ctx):
     await ctx.followup.send(embed=embed)
 
     # ---- スライド更新 ----
-    payload2 = {
+    payload = {
         "action": "update_slide",
         "teamA": [{"name": p[0], "icon": p[3]} for p in teamA],
         "teamB": [{"name": p[0], "icon": p[3]} for p in teamB],
