@@ -107,19 +107,16 @@ async def on_ready():
     global CUSTOM_EMOJIS
     CUSTOM_EMOJIS.clear()
 
-    # --- 全サーバーの絵文字をキャッシュ ---
+    # 旧バージョンと同じキャッシュ形式に戻す
     for guild in bot.guilds:
         for emoji in guild.emojis:
-            CUSTOM_EMOJIS[emoji.name.lower()] = f"<:{emoji.name}:{emoji.id}>"
+            CUSTOM_EMOJIS[emoji.name.lower()] = str(emoji)
 
-    logging.info(f"✅ カスタム絵文字読み込み完了: {len(CUSTOM_EMOJIS)}個")
     await bot.sync_commands()
     await bot.change_presence(activity=discord.Game(name="/peko rank / team / teamtest / remove"))
-    logging.info(f"✅ ログイン完了: {bot.user} ({bot.user.id})")
-
+    logging.info(f"✅ カスタム絵文字読み込み完了: {len(CUSTOM_EMOJIS)}個")
 
 def get_rank_emoji(rank_name: str, emoji_dict: dict) -> str:
-    """ランク名に対応するカスタム絵文字を返す"""
     if not rank_name:
         return ""
 
@@ -135,12 +132,11 @@ def get_rank_emoji(rank_name: str, emoji_dict: dict) -> str:
         "イモータル": "Immortal",
         "レディアント": "Radiant",
     }.get(base, "")
-
     num = re.sub(r"\D", "", rank_name)
-    emoji_key = f"{emoji_name}{num}".lower()  # Gold2 → gold2
+    emoji_key = f"{emoji_name}{num}".lower()
 
+    # 🔥 str(emoji) で登録されてるので、これが直接 <::>形式で返る！
     return emoji_dict.get(emoji_key, rank_name)
-
 
 
 # ============================================================
