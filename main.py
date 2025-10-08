@@ -97,21 +97,14 @@ def generate_balanced_teams(players):
     return None, None, None, 0, 0
 
 # ============================================================
-# 🧩 ランク絵文字
+# 🧩 カスタム絵文字でランク表示
 # ============================================================
-
-def get_rank_emoji(rank_name: str) -> str:
-    """
-    ランク名を英語形式に変換し、:Gold1: のような形式で返す
-    """
+def get_rank_emoji(rank_name: str, emoji_dict: dict) -> str:
+    """サーバー内のカスタム絵文字があれば<:Gold2:ID>で返す"""
     if not rank_name:
         return ""
-
     base = re.sub(r"\d", "", rank_name)
-    num = re.sub(r"\D", "", rank_name)
-
-    # 日本語→英語マッピング
-    base_en = {
+    emoji_name = {
         "アイアン": "Iron",
         "ブロンズ": "Bronze",
         "シルバー": "Silver",
@@ -120,11 +113,12 @@ def get_rank_emoji(rank_name: str) -> str:
         "ダイヤモンド": "Diamond",
         "アセンダント": "Ascendant",
         "イモータル": "Immortal",
-        "レディアント": "Radiant"
-    }.get(base, base)
-
-    # :Gold1: のようなDiscord絵文字形式で返す
-    return f":{base_en}{num}:"
+        "レディアント": "Radiant",
+    }.get(base, "")
+    num = re.sub(r"\D", "", rank_name)
+    emoji_key = f"{emoji_name}{num}" if num else emoji_name
+    emoji = emoji_dict.get(emoji_key.lower())  # ←小文字対応
+    return str(emoji) if emoji else f":{emoji_key}:"
 
 # ============================================================
 # 🧩 コマンドグループ
