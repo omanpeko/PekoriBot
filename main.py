@@ -101,26 +101,34 @@ def generate_balanced_teams(players):
     return None, None, None, 0, 0
 
 # ============================================================
-# 🧩 ランク絵文字
+# 🧩 ランク絵文字を自動検出して使用（短縮版）
 # ============================================================
-def get_rank_emoji(rank_name):
+
+CUSTOM_EMOJIS = {}
+
+@bot.event
+async def on_ready():
+    """Bot起動時に全サーバーの絵文字をキャッシュ"""
+    CUSTOM_EMOJIS.clear()
+    for g in bot.guilds:
+        for e in g.emojis:
+            CUSTOM_EMOJIS[e.name.lower()] = str(e)
+    await bot.change_presence(activity=discord.Game(name="/peko rank / teamtest / remove"))
+    logging.info(f"✅ 絵文字キャッシュ完了: {len(CUSTOM_EMOJIS)}個")
+
+def get_rank_emoji(rank_name: str) -> str:
+    """ランク名から自動で絵文字取得（存在しない場合はテキスト）"""
     if not rank_name:
-        return ""
+        return rank_name
     base = re.sub(r"\d", "", rank_name)
-    emoji_name = {
-        "アイアン": "Iron",
-        "ブロンズ": "Bronze",
-        "シルバー": "Silver",
-        "ゴールド": "Gold",
-        "プラチナ": "Platinum",
-        "ダイヤモンド": "Diamond",
-        "アセンダント": "Ascendant",
-        "イモータル": "Immortal",
-        "レディアント": "Radiant",
-    }.get(base, "")
     num = re.sub(r"\D", "", rank_name)
-    emoji_key = f":{emoji_name}{num}:" if num else f":{emoji_name}:"
-    return emoji_key
+    base_en = {
+        "アイアン": "Iron", "ブロンズ": "Bronze", "シルバー": "Silver",
+        "ゴールド": "Gold", "プラチナ": "Platinum", "ダイヤモンド": "Diamond",
+        "アセンダント": "Ascendant", "イモータル": "Immortal", "レディアント": "Radiant"
+    }.get(base, base)
+    key = f"{base_en}{num}".lower()
+    return CUSTOM_EMOJIS.get(key, rank_name)
 
 # ============================================================
 # 🧩 /peko コマンドグループ
