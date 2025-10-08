@@ -327,30 +327,27 @@ bot.add_application_command(peko)
 
 @bot.event
 async def on_ready():
-    logging.info("🎮 Bot起動中...")
-
-    # =====================================================
-    # ⚙️ コマンド同期 & ステータス設定
-    # =====================================================
     await bot.sync_commands()
+    logging.info("✅ PekoriBot v1.5 コマンド同期完了")
+
     await bot.change_presence(activity=discord.Game(name="/peko rank / team / teamtest / remove"))
-    logging.info(f"✅ PekoriBot v1.5 コマンド同期完了")
     logging.info(f"✅ ログイン完了: {bot.user} ({bot.user.id})")
 
-    # =====================================================
-    # 🎨 カスタム絵文字読み込みをバックグラウンドで実行
-    # =====================================================
+    # 🎨 ログイン完了後に絵文字読み込みタスクを起動
     bot.loop.create_task(load_custom_emojis())
 
 
+# ============================================================
+# 🎨 カスタム絵文字読み込みタスク
+# ============================================================
 async def load_custom_emojis():
     global CUSTOM_EMOJIS
-    CUSTOM_EMOJIS = {}
-    emoji_count = 0
+    CUSTOM_EMOJIS.clear()
 
-    # guildsの同期が安定するまで少し待機
+    # 少し待ってから（ギルド情報同期を安定させる）
     await discord.utils.sleep_until(discord.utils.utcnow() + discord.utils.timedelta(seconds=3))
 
+    emoji_count = 0
     for guild in bot.guilds:
         logging.info(f"🧩 ギルド読込中: {guild.name}")
         for emoji in guild.emojis:
@@ -358,3 +355,14 @@ async def load_custom_emojis():
             emoji_count += 1
 
     logging.info(f"✅ カスタム絵文字読み込み完了: {emoji_count}個")
+
+
+# ============================================================
+# メインエントリポイント
+# ============================================================
+if __name__ == "__main__":
+    token = os.getenv("DISCORD_TOKEN", "").strip().strip('"').strip("'")
+    if not token:
+        raise RuntimeError("DISCORD_TOKEN が未設定です。")
+    bot.run(token)
+
