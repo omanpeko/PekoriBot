@@ -240,8 +240,6 @@ async def process_team_result(ctx, data):
     powerA = sum(p[2] for p in teamA)
     powerB = sum(p[2] for p in teamB)
 
-    # Firebaseにチーム結果を送信
-    save_team_to_firestore(teamA, teamB)
 
     # =============================
     # Embed生成（チーム結果）
@@ -264,14 +262,37 @@ async def process_team_result(ctx, data):
     embed.add_field(name="　", value=f"組み合わせ候補：{idx}/{total}", inline=False)
     await ctx.followup.send(embed=embed)
 
+
     # =============================
-    # GASスライド生成（画像URL取得）
+    # 
+    # =============================
+    def rank_to_eng(rank_name: str) -> str:
+    rank_map = {
+        "アイアン": "Iron", "ブロンズ": "Bronze", "シルバー": "Silver",
+        "ゴールド": "Gold", "プラチナ": "Platinum", "ダイヤモンド": "Diamond",
+        "アセンダント": "Ascendant", "イモータル": "Immortal", "レディアント": "Radiant"
+    }
+    base = re.sub(r"\d", "", rank_name)
+    num = re.sub(r"\D", "", rank_name)
+    return f"{rank_map.get(base, 'Unknown')}{num}"
+
+    # =============================
+    # データを成型
     # =============================
     payload2 = {
         "action": "update_slide",
         "teamA": [{"name": p[0], "icon": p[3], "rank": p[1]} for p in teamA],
         "teamB": [{"name": p[0], "icon": p[3], "rank": p[1]} for p in teamB],
     }
+    # =============================
+    # Firebaseにチーム結果を送信
+    # =============================
+    save_team_to_firestore(payload2)
+    
+    # =============================
+    # GASスライド生成（画像URL取得）
+    # =============================
+    
     async with aiohttp.ClientSession() as session:
         async with session.post(GAS_SLIDE_URL, json=payload2) as r2:
             text = await r2.text()
@@ -346,31 +367,44 @@ logging.info("✅ Firestore 初期化完了（Railway環境変数から）")
 # ============================================================
 # 🧩 チームデータ書き込み関数
 # ============================================================
-def save_team_to_firestore(teamA, teamB):
+def save_team_to_firestore(payload):
     """Discordチーム分け結果を Firestore に保存"""
-    doc_ref = db.collection("TwitchChatDatabase").document("VALORANTteam")
+    try:
+        # Firestore のドキュメント指定
+        doc_ref = db.collection("TwitchChatDatabase").document("VALORANTteam")
 
-    # 一旦削除してリセット
-    for col_name in ["アタッカー", "ディフェンダー"]:
-        col_ref = doc_ref.collection(col_name)
-        for doc in col_ref.stream():
-            col_ref.document(doc.id).delete()
+        # 古いデータを削除してリセット
+        for col_name in ["アタッカー", "ディフェンダー"]:
+            col_ref = doc_ref.collection(col_name)
+            for doc in col_ref.stream():
+                col_ref.document(doc.id).delete()
 
-    # 保存処理
-    def save_team(collection_name, team):
-        col_ref = doc_ref.collection(collection_name)
-        for i, p in enumerate(team, start=1):
-            col_ref.document(f"player{i}").set({
-                "name": p["name"],
-                "rank": p["rank"],
-                "icon": p["icon"],
-                "rankImg": f"https://raw.githubusercontent.com/omanpeko/PekoriBot/main/rank_img/{p['rank_img']}.png"
-            })
+        # チームA（アタッカー）登録
+        teamA = payload.get("teamA", [])
+        teamB = payload.get("teamB", [])
+        rankImg_base = payload.get("rankImg", "")
 
-    save_team("アタッカー", teamA)
-    save_team("ディフェンダー", teamB)
+        # ✅ ランク画像はチームごとの各プレイヤーのランクを参照して生成
+        def save_team(collection_name, team):
+            col_ref = doc_ref.collection(collection_name)
+            for i, p in enumerate(team, start=1):
+                rank_img_url = f"https://raw.githubusercontent.com/omanpeko/PekoriBot/main/rank_img/{rank_to_eng(p['rank'])}.png"
+                col_ref.document(f"player{i}").set({
+                    "name": p["name"],
+                    "rank": p["rank"],
+                    "icon": p["icon"],
+                    "rankImg": rank_img_url
+                })
 
-    print("✅ VALORANTteam データを Firestore に保存しました。")
+        # 保存実行
+        save_team("アタッカー", teamA)
+        save_team("ディフェンダー", teamB)
+
+        logging.info("✅ VALORANTteam データを Firestore に保存しました。")
+
+    except Exception as e:
+        logging.error(f"💥 Firestore保存エラー: {e}")
+
 
 # ============================================================
 # 🚀 起動
