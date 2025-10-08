@@ -2,6 +2,7 @@
 import os
 import re
 import random
+import ast
 import itertools
 import aiohttp
 import logging
@@ -264,15 +265,38 @@ async def teamtest(ctx):
 
     async with aiohttp.ClientSession() as session:
         async with session.post(GAS_WEBHOOK_URL, json=payload) as r:
-            data = await r.json()
+            text = await r.text()
+
+            try:
+                data = await r.json()
+            except:
+                # JSONでない場合はテキストをPythonのリスト形式に変換
+                try:
+                    data = ast.literal_eval(text)
+                except Exception as e:
+                    await ctx.followup.send(f"⚠️ 受信データ変換失敗: {e}\n{text[:500]}")
+                    return
+
+    # dataの中身が文字列の場合 -> JSONに再変換
+    parsed_data = []
+    for d in data:
+        if isinstance(d, str):
+            try:
+                d = ast.literal_eval(d)
+            except Exception:
+                continue
+        if isinstance(d, dict):
+            parsed_data.append(d)
+
+    if not parsed_data:
+        await ctx.followup.send("⚠️ データ取得失敗（空または形式不正）")
+        return
 
     players = []
-    for d in data:
+    for d in parsed_data:
         name = d.get("name", "不明")
         rank = d.get("rank", "不明")
         icon = d.get("icon") or d.get("iconUrl") or ""
-        if not icon:
-            logging.warning(f"⚠️ {name} のアイコンURLが空です。")
         point = RANK_POINTS.get(rank, 0)
         players.append((name, rank, point, icon))
 
