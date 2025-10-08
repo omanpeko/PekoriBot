@@ -299,10 +299,22 @@ async def team(ctx):
 # ============================================================
 # 🧪 /peko teamtest
 # ============================================================
-@peko.command(name="teamtest", description="登録済み10人でチーム分けテスト")
+@peko.command(name="teamtest", description="RankDatabaseから10人を取得してチーム分けテスト")
 async def teamtest(ctx):
     await ctx.defer()
-    user_ids = [str(i) for i in PLAYER_IDS]
+
+    payload = {"action": "fetch_team_data", "user_ids": [str(i) for i in PLAYER_IDS]}
+
+    async with aiohttp.ClientSession() as session:
+        async with session.post(GAS_RANK_URL, json=payload) as r:
+            try:
+                data = await r.json() 
+            except Exception as e:
+                text = await r.text()
+                await ctx.followup.send(f"⚠️ JSON変換失敗: {e}\n{text}")
+                return
+
+    # ✅ チーム処理（共通関数）
     await process_team_result(ctx, data)
 
 # ============================================================
