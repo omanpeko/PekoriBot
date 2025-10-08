@@ -261,24 +261,21 @@ async def process_team_result(ctx, data):
         "teamA": [{"name": p[0], "icon": p[3]} for p in teamA],
         "teamB": [{"name": p[0], "icon": p[3]} for p in teamB],
     }
-
     async with aiohttp.ClientSession() as session:
         async with session.post(GAS_SLIDE_URL, json=payload2) as r2:
-            if r2.status == 200:
-                try:
-                    result = await r2.json()
-                    image_url = result.get("url")
+            text = await r2.text()  # ←ここ変更
+            try:
+                result = json.loads(text)  # ←ここ追加
+                image_url = result.get("url")
+                if image_url:
+                    img_embed = discord.Embed(color=main_color)
+                    img_embed.set_image(url=image_url)
+                    await ctx.followup.send(embed=img_embed)
+                else:
+                    await ctx.followup.send(f"⚠️ GAS応答にURLがありません。\n{text}")
+            except Exception as e:
+                await ctx.followup.send(f"⚠️ GAS応答の解析失敗: {e}\n{text}")
 
-                    # ✅ PNG画像だけDiscordに表示
-                    if image_url:
-                        img_embed = discord.Embed(color=main_color)
-                        img_embed.set_image(url=image_url)
-                        await ctx.followup.send(embed=img_embed)
-                except Exception as e:
-                    text = await r2.text()
-                    await ctx.followup.send(f"⚠️ スライド応答解析失敗: {e}\n{text}")
-            else:
-                await ctx.followup.send(f"⚠️ スライド更新エラー ({r2.status})")
 
 
 # ============================================================
