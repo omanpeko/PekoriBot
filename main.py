@@ -29,7 +29,7 @@ GUILD_IDS = [
 ]
 
 # ---- RankDatabase(GAS) URL ----
-GAS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbwCRqFmTZTSLVBnIUEasJviLwjvhe1WD3XE9yC7PF3JGa28E20iqf3ivb_DRHA0leivQQ/exec"
+GAS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbztYZmisYPC_BbyY-lNG296sIQHZBo_iu1xMcf8M_5_QJX7DGUNcz5Z2HP2gWgW-RvvEg/exec"
 
 # ---- テスト用プレイヤーID ----
 PLAYER_IDS = [
