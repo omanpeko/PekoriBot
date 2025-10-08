@@ -330,11 +330,18 @@ async def teamtest(ctx):
 
 
 # ============================================================
-# 🔥 Firestore 初期化
+# 🔥 Firestore 初期化（Railway環境変数から）
 # ============================================================
-cred = credentials.Certificate("twitchchatdatabase-firebase-adminsdk-fbsvc-5a18cc4225.json")  # 秘密鍵ファイル
+firebase_json = os.getenv("FIREBASE_CREDENTIALS")
+if not firebase_json:
+    raise RuntimeError("❌ FIREBASE_CREDENTIALS が設定されていません。Railwayの環境変数を確認してください。")
+
+cred_info = json.loads(firebase_json)
+cred = credentials.Certificate(cred_info)
 firebase_admin.initialize_app(cred)
 db = firestore.client()
+
+logging.info("✅ Firestore 初期化完了（Railway環境変数から）")
 
 # ============================================================
 # 🧩 チームデータ書き込み関数
