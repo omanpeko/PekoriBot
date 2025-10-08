@@ -6,6 +6,7 @@ import ast
 import json
 import itertools
 import aiohttp
+import asyncio
 import logging
 import discord
 from discord.ext import commands
