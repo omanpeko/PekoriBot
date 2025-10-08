@@ -24,14 +24,11 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 # ---- 対応サーバーID ----
 GUILD_IDS = [
     1357655899212349490,  # あなたのサーバー
-    #932269784228306995,   # CYNTHIA
-    #1131436758970671104,  # ぺこ
 ]
 
 # ---- GAS Webhook URLs ----
 GAS_RANK_URL = "https://script.google.com/macros/s/AKfycbztYZmisYPC_BbyY-lNG296sIQHZBo_iu1xMcf8M_5_QJX7DGUNcz5Z2HP2gWgW-RvvEg/exec"
 GAS_SLIDE_URL = "https://script.google.com/macros/s/AKfycbwCRqFmTZTSLVBnIUEasJviLwjvhe1WD3XE9yC7PF3JGa28E20iqf3ivb_DRHA0leivQQ/exec"
-
 
 # ---- テスト用プレイヤーID ----
 PLAYER_IDS = [
@@ -94,32 +91,26 @@ def generate_balanced_teams(players):
             total = len(valid_combos)
             idx = random.randint(0, total - 1)
             teamA, teamB, diff = valid_combos[idx]
-
-            # ランダム反転
             if random.choice([True, False]):
                 teamA, teamB = teamB, teamA
-
             return teamA, teamB, diff, idx + 1, total
     return None, None, None, 0, 0
 
 # ============================================================
-# 🧩 ランク絵文字を自動検出して使用（短縮版）
+# 🧩 ランク絵文字キャッシュ
 # ============================================================
-
 CUSTOM_EMOJIS = {}
 
 @bot.event
 async def on_ready():
-    """Bot起動時に全サーバーの絵文字をキャッシュ"""
     CUSTOM_EMOJIS.clear()
     for g in bot.guilds:
         for e in g.emojis:
             CUSTOM_EMOJIS[e.name.lower()] = str(e)
-    await bot.change_presence(activity=discord.Game(name="/peko rank / teamtest / remove"))
+    await bot.change_presence(activity=discord.Game(name="/peko rank / team / teamtest / remove"))
     logging.info(f"✅ 絵文字キャッシュ完了: {len(CUSTOM_EMOJIS)}個")
 
 def get_rank_emoji(rank_name: str) -> str:
-    """ランク名から自動で絵文字取得（存在しない場合はテキスト）"""
     if not rank_name:
         return rank_name
     base = re.sub(r"\d", "", rank_name)
@@ -133,7 +124,7 @@ def get_rank_emoji(rank_name: str) -> str:
     return CUSTOM_EMOJIS.get(key, rank_name)
 
 # ============================================================
-# 🧩 /peko コマンドグループ
+# 🧩 コマンドグループ
 # ============================================================
 peko = SlashCommandGroup("peko", "PekoriBotコマンド群", guild_ids=GUILD_IDS)
 
@@ -155,7 +146,7 @@ async def rank(
         await ctx.followup.send("⚠️ ランク名を入力してください。")
         return
 
-    # 正規化
+    # ---- 正規化処理 ----
     input_text = rank_name.strip().lower().replace("　", "").replace(" ", "")
     input_text = re.sub(r"[０-９]", lambda m: chr(ord(m.group(0)) - 65248), input_text)
     input_text = re.sub(r"(\d+)", lambda m: str(int(m.group(1))), input_text)
@@ -186,7 +177,6 @@ async def rank(
         )
         return
 
-    # GAS送信
     payload = {
         "action": "add",
         "username": username,
@@ -214,7 +204,6 @@ async def remove(ctx):
     await ctx.defer()
     user_id = str(ctx.author.id)
     payload = {"action": "remove", "user_id": user_id}
-
     async with aiohttp.ClientSession() as session:
         async with session.post(GAS_RANK_URL, json=payload) as r:
             text = await r.text()
@@ -227,67 +216,22 @@ async def remove(ctx):
             await ctx.followup.send(msg)
 
 # ============================================================
-# 🎮 /peko team
+# 🧩 共通関数：チーム分け＋スライド更新
 # ============================================================
-@peko.command(name="team", description="VC内のメンバーをランクデータからチーム分けします")
-async def team(ctx):
-    if not ctx.author.voice or not ctx.author.voice.channel:
-        await ctx.respond("⚠️ ボイスチャンネルに参加してください。")
-        return
-
-    members = [m for m in ctx.author.voice.channel.members if not m.bot]
-    if len(members) < 2:
-        await ctx.respond("⚠️ 2人以上で実行してください。")
-        return
-
-    await ctx.defer()
-    user_ids = [str(m.id) for m in members]
+async def process_team(ctx, user_ids: list, title: str):
     payload = {"action": "fetch_team_data", "user_ids": user_ids}
-
-    async with aiohttp.ClientSession() as session:
-        async with session.post(GAS_RANK_URL, json=payload) as r:
-            data = await r.json()
-
-    players = []
-    for d in data:
-        name = d.get("name", "不明")
-        rank = d.get("rank", "不明")
-        point = RANK_POINTS.get(rank, 0)
-        players.append((name, rank, point))
-
-    teamA, teamB, diff, idx, total = generate_balanced_teams(players)
-    powerA = sum(p[2] for p in teamA)
-    powerB = sum(p[2] for p in teamB)
-
-    embed = discord.Embed(title="チーム分け結果", color=main_color)
-    embed.add_field(name="🟥 アタッカー", value="\n".join([f"{get_rank_emoji(p[1])} {p[0]}" for p in teamA]) + f"\nポイント：{powerA}", inline=True)
-    embed.add_field(name="🟦 ディフェンダー", value="\n".join([f"{get_rank_emoji(p[1])} {p[0]}" for p in teamB]) + f"\nポイント：{powerB}", inline=True)
-    embed.add_field(name="　", value=f"組み合わせ候補：{idx}/{total}", inline=False)
-    await ctx.followup.send(embed=embed)
-
-# ============================================================
-# 🧪 /peko teamtest
-# ============================================================
-@peko.command(name="teamtest", description="RankDatabaseから10人を取得してチーム分けテスト")
-async def teamtest(ctx):
-    await ctx.defer()
-    payload = {"action": "fetch_team_data", "user_ids": [str(i) for i in PLAYER_IDS]}
-
     async with aiohttp.ClientSession() as session:
         async with session.post(GAS_RANK_URL, json=payload) as r:
             text = await r.text()
-
             try:
                 data = await r.json()
             except:
-                # JSONでない場合はテキストをPythonのリスト形式に変換
                 try:
                     data = ast.literal_eval(text)
                 except Exception as e:
-                    await ctx.followup.send(f"⚠️ 受信データ変換失敗: {e}\n{text[:500]}")
+                    await ctx.followup.send(f"⚠️ データ変換失敗: {e}\n{text[:300]}")
                     return
 
-    # dataの中身が文字列の場合 -> JSONに再変換
     parsed_data = []
     for d in data:
         if isinstance(d, str):
@@ -314,9 +258,19 @@ async def teamtest(ctx):
     powerA = sum(p[2] for p in teamA)
     powerB = sum(p[2] for p in teamB)
 
-    embed = discord.Embed(title="チーム分けテスト結果", color=main_color)
-    embed.add_field(name="🟥 アタッカー", value="\n".join([f"{get_rank_emoji(p[1])} {p[0]}" for p in teamA]) + f"\nポイント：{powerA}", inline=True)
-    embed.add_field(name="🟦 ディフェンダー", value="\n".join([f"{get_rank_emoji(p[1])} {p[0]}" for p in teamB]) + f"\nポイント：{powerB}", inline=True)
+    embed = discord.Embed(title=title, color=main_color)
+    embed.add_field(
+        name="🟥 アタッカー",
+        value="\n".join([f"{get_rank_emoji(p[1])} {p[0]}" for p in teamA])
+              + f"\nポイント：{powerA}",
+        inline=True
+    )
+    embed.add_field(
+        name="🟦 ディフェンダー",
+        value="\n".join([f"{get_rank_emoji(p[1])} {p[0]}" for p in teamB])
+              + f"\nポイント：{powerB}",
+        inline=True
+    )
     embed.add_field(name="　", value=f"組み合わせ候補：{idx}/{total}", inline=False)
     await ctx.followup.send(embed=embed)
 
@@ -331,12 +285,42 @@ async def teamtest(ctx):
             if r2.status == 200:
                 try:
                     result = await r2.json()
-                    await ctx.followup.send(result.get("message", "🖼️ スライド更新完了！"))
+                    msg = result.get("message", "🖼️ スライド更新完了！")
+                    if "url" in result:
+                        msg += f"\n🔗 [プレビューを見る]({result['url']})"
+                    await ctx.followup.send(msg)
                 except:
                     text = await r2.text()
                     await ctx.followup.send(f"🖼️ スライド更新応答: {text}")
             else:
                 await ctx.followup.send(f"⚠️ スライド更新エラー ({r2.status})")
+
+# ============================================================
+# 🎮 /peko team
+# ============================================================
+@peko.command(name="team", description="VCメンバーでチーム分け＋スライド更新")
+async def team(ctx):
+    if not ctx.author.voice or not ctx.author.voice.channel:
+        await ctx.respond("⚠️ ボイスチャンネルに参加してください。")
+        return
+
+    members = [m for m in ctx.author.voice.channel.members if not m.bot]
+    if len(members) < 2:
+        await ctx.respond("⚠️ 2人以上で実行してください。")
+        return
+
+    await ctx.defer()
+    user_ids = [str(m.id) for m in members]
+    await process_team(ctx, user_ids, "チーム分け結果")
+
+# ============================================================
+# 🧪 /peko teamtest
+# ============================================================
+@peko.command(name="teamtest", description="登録済み10人でチーム分けテスト")
+async def teamtest(ctx):
+    await ctx.defer()
+    user_ids = [str(i) for i in PLAYER_IDS]
+    await process_team(ctx, user_ids, "チーム分けテスト結果")
 
 # ============================================================
 # 🚀 起動
@@ -346,7 +330,7 @@ bot.add_application_command(peko)
 @bot.event
 async def on_ready():
     await bot.sync_commands()
-    logging.info("✅ PekoriBot v1.4 コマンド同期完了")
+    logging.info("✅ PekoriBot v1.5 コマンド同期完了")
     await bot.change_presence(activity=discord.Game(name="/peko rank / team / teamtest / remove"))
     logging.info(f"✅ ログイン完了: {bot.user} ({bot.user.id})")
 
