@@ -119,8 +119,10 @@ async def on_ready():
 
 
 def get_rank_emoji(rank_name: str, emoji_dict: dict) -> str:
+    """ランク名に対応するカスタム絵文字を返す"""
     if not rank_name:
         return ""
+
     base = re.sub(r"\d", "", rank_name)
     emoji_name = {
         "アイアン": "Iron",
@@ -133,9 +135,12 @@ def get_rank_emoji(rank_name: str, emoji_dict: dict) -> str:
         "イモータル": "Immortal",
         "レディアント": "Radiant",
     }.get(base, "")
+
     num = re.sub(r"\D", "", rank_name)
-    emoji_key = f"{emoji_name}{num}".lower()
+    emoji_key = f"{emoji_name}{num}".lower()  # Gold2 → gold2
+
     return emoji_dict.get(emoji_key, rank_name)
+
 
 
 # ============================================================
