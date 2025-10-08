@@ -102,8 +102,17 @@ def generate_balanced_teams(players):
 # ============================================================
 # 🧩 カスタム絵文字でランク表示
 # ============================================================
+@bot.event
+async def on_ready():
+    CUSTOM_EMOJIS.clear()
+    for guild in bot.guilds:
+        for emoji in guild.emojis:
+            CUSTOM_EMOJIS[emoji.name.lower()] = f"<:{emoji.name}:{emoji.id}>"
+    await bot.sync_commands()
+    logging.info(f"✅ カスタム絵文字読み込み完了: {len(CUSTOM_EMOJIS)}個")
+    await bot.change_presence(activity=discord.Game(name="/peko rank / team / teamtest / remove"))
+
 def get_rank_emoji(rank_name: str, emoji_dict: dict) -> str:
-    """サーバー内のカスタム絵文字があれば<:Gold2:ID>で返す"""
     if not rank_name:
         return ""
     base = re.sub(r"\d", "", rank_name)
@@ -119,9 +128,9 @@ def get_rank_emoji(rank_name: str, emoji_dict: dict) -> str:
         "レディアント": "Radiant",
     }.get(base, "")
     num = re.sub(r"\D", "", rank_name)
-    emoji_key = f"{emoji_name}{num}" if num else emoji_name
-    emoji = emoji_dict.get(emoji_key.lower())  # ←小文字対応
-    return str(emoji) if emoji else f":{emoji_key}:"
+    emoji_key = f"{emoji_name}{num}".lower()
+    return emoji_dict.get(emoji_key, rank_name)
+
 
 # ============================================================
 # 🧩 コマンドグループ
