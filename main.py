@@ -267,14 +267,14 @@ async def process_team_result(ctx, data):
     # 
     # =============================
     def rank_to_eng(rank_name: str) -> str:
-    rank_map = {
-        "アイアン": "Iron", "ブロンズ": "Bronze", "シルバー": "Silver",
-        "ゴールド": "Gold", "プラチナ": "Platinum", "ダイヤモンド": "Diamond",
-        "アセンダント": "Ascendant", "イモータル": "Immortal", "レディアント": "Radiant"
-    }
-    base = re.sub(r"\d", "", rank_name)
-    num = re.sub(r"\D", "", rank_name)
-    return f"{rank_map.get(base, 'Unknown')}{num}"
+        rank_map = {
+            "アイアン": "Iron", "ブロンズ": "Bronze", "シルバー": "Silver",
+            "ゴールド": "Gold", "プラチナ": "Platinum", "ダイヤモンド": "Diamond",
+            "アセンダント": "Ascendant", "イモータル": "Immortal", "レディアント": "Radiant"
+        }
+        base = re.sub(r"\d", "", rank_name)
+        num = re.sub(r"\D", "", rank_name)
+        return f"{rank_map.get(base, 'Unknown')}{num}"
 
     # =============================
     # データを成型
