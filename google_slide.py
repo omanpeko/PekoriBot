@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 import aiohttp
 import logging
-
 from typing import List, Dict
 
-# --- あなたのGAS URLをここに ---
+# ---- Google Apps Script（GAS）のエンドポイント ----
 GAS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbwCRqFmTZTSLVBnIUEasJviLwjvhe1WD3XE9yC7PF3JGa28E20iqf3ivb_DRHA0leivQQ/exec"
 
 
@@ -33,10 +32,11 @@ async def generate_team_image(players: List[Dict[str, str]]) -> str:
 
                 data = await resp.json()
                 if data.get("status") == "ok":
+                    logging.info("✅ スライド画像生成成功")
                     return data.get("url")
                 else:
-                    logging.error(f"GASエラー: {data}")
+                    logging.error(f"⚠️ GASエラー: {data}")
                     return None
     except Exception as e:
-        logging.error(f"GAS送信エラー: {e}")
+        logging.error(f"❌ GAS送信エラー: {e}")
         return None
