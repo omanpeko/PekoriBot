@@ -28,8 +28,10 @@ GUILD_IDS = [
     #1131436758970671104,  # ぺこ
 ]
 
-# ---- RankDatabase(GAS) URL ----
-GAS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbztYZmisYPC_BbyY-lNG296sIQHZBo_iu1xMcf8M_5_QJX7DGUNcz5Z2HP2gWgW-RvvEg/exec"
+# ---- GAS Webhook URLs ----
+GAS_RANK_URL = "https://script.google.com/macros/s/AKfycbztYZmisYPC_BbyY-lNG296sIQHZBo_iu1xMcf8M_5_QJX7DGUNcz5Z2HP2gWgW-RvvEg/exec"
+GAS_SLIDE_URL = "https://script.google.com/macros/s/AKfycbwCRqFmTZTSLVBnIUEasJviLwjvhe1WD3XE9yC7PF3JGa28E20iqf3ivb_DRHA0leivQQ/exec"
+
 
 # ---- テスト用プレイヤーID ----
 PLAYER_IDS = [
@@ -194,7 +196,7 @@ async def rank(
     }
 
     async with aiohttp.ClientSession() as session:
-        async with session.post(GAS_WEBHOOK_URL, json=payload) as r:
+        async with session.post(GAS_RANK_URL, json=payload) as r:
             text = await r.text()
             if "UPDATED" in text:
                 msg = f"🔁 {username} さんのランクを **{matched_rank}** に更新しました！"
@@ -214,7 +216,7 @@ async def remove(ctx):
     payload = {"action": "remove", "user_id": user_id}
 
     async with aiohttp.ClientSession() as session:
-        async with session.post(GAS_WEBHOOK_URL, json=payload) as r:
+        async with session.post(GAS_RANK_URL, json=payload) as r:
             text = await r.text()
             if "REMOVED" in text:
                 msg = f"🗑️ {ctx.author.display_name} さんのデータを削除しました。"
@@ -243,7 +245,7 @@ async def team(ctx):
     payload = {"action": "fetch_team_data", "user_ids": user_ids}
 
     async with aiohttp.ClientSession() as session:
-        async with session.post(GAS_WEBHOOK_URL, json=payload) as r:
+        async with session.post(GAS_RANK_URL, json=payload) as r:
             data = await r.json()
 
     players = []
@@ -272,7 +274,7 @@ async def teamtest(ctx):
     payload = {"action": "fetch_team_data", "user_ids": [str(i) for i in PLAYER_IDS]}
 
     async with aiohttp.ClientSession() as session:
-        async with session.post(GAS_WEBHOOK_URL, json=payload) as r:
+        async with session.post(GAS_RANK_URL, json=payload) as r:
             text = await r.text()
 
             try:
@@ -325,7 +327,7 @@ async def teamtest(ctx):
         "teamB": [{"name": p[0], "icon": p[3]} for p in teamB],
     }
     async with aiohttp.ClientSession() as session:
-        async with session.post(GAS_WEBHOOK_URL, json=payload2) as r2:
+        async with session.post(GAS_SLIDE_URL, json=payload2) as r2:
             if r2.status == 200:
                 try:
                     result = await r2.json()
