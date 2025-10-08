@@ -7,7 +7,7 @@ import itertools
 import aiohttp
 import discord
 from discord.ext import commands
-from discord.commands import SlashCommandGroup
+from discord.commands import SlashCommandGroup, Option
 
 logging.basicConfig(level=logging.INFO)
 
@@ -20,14 +20,14 @@ intents.voice_states = True
 intents.members = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# ---- サーバーID（複数対応） ----
+# ---- 対応する複数サーバーID ----
 GUILD_IDS = [
     1357655899212349490,  # あなたのサーバー
     932269784228306995,   # CYNTHIA
     1131436758970671104,  # ぺこ
 ]
 
-# ---- データベース代わりの固定リスト ----
+# ---- データベース代わりの固定プレイヤーリスト ----
 PLAYER_IDS = [
     447824706477752321,
     845865706126180393,
@@ -48,8 +48,9 @@ main_color = discord.Color.from_rgb(255, 140, 0)
 # ---- GAS Webhook URL ----
 GAS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbztYZmisYPC_BbyY-lNG296sIQHZBo_iu1xMcf8M_5_QJX7DGUNcz5Z2HP2gWgW-RvvEg/exec"
 
+
 # ============================================================
-# 🧮 ランクデータ
+# 🧮 ランクポイントテーブル
 # ============================================================
 RANK_POINTS = {
     "アイアン1": 1, "アイアン2": 2, "アイアン3": 3,
@@ -65,14 +66,14 @@ RANK_POINTS = {
 
 
 # ============================================================
-# 🎲 チーム分けアルゴリズム（戦力差1から順に緩和）
+# ⚔️ チーム分けロジック（戦力差1から順に緩和）
 # ============================================================
 def generate_balanced_teams(players):
     all_combos = list(itertools.combinations(range(len(players)), len(players)//2))
     seen = set()
 
-    for max_diff in range(1, 999):  # 1から緩和
-        valid_combinations = []
+    for max_diff in range(1, 999):  # 1から順に緩和
+        valid_combos = []
         for combo in all_combos:
             complement = tuple(sorted(set(range(len(players))) - set(combo)))
             key = tuple(sorted(combo))
@@ -88,20 +89,20 @@ def generate_balanced_teams(players):
             diff = abs(sumA - sumB)
 
             if diff <= max_diff:
-                valid_combinations.append((teamA, teamB, diff))
+                valid_combos.append((teamA, teamB, diff))
 
-        if valid_combinations:
-            total = len(valid_combinations)
-            selected_index = random.randint(0, total - 1)
-            teamA, teamB, diff = valid_combinations[selected_index]
-            logging.info(f"✅ 戦力差 {max_diff} 以下でマッチング成功 ({len(valid_combinations)}通り)")
-            return teamA, teamB, diff, selected_index + 1, total
+        if valid_combos:
+            total = len(valid_combos)
+            idx = random.randint(0, total - 1)
+            teamA, teamB, diff = valid_combos[idx]
+            logging.info(f"✅ 戦力差 {max_diff} 以下でマッチ成功 ({len(valid_combos)}通り)")
+            return teamA, teamB, diff, idx + 1, total
 
     return None, None, None, 0, 0
 
 
 # ============================================================
-# 🧩 スラッシュコマンド登録
+# 🧩 /peko コマンドグループ
 # ============================================================
 peko = SlashCommandGroup("peko", "PekoriBotのコマンド群", guild_ids=GUILD_IDS)
 
@@ -110,17 +111,19 @@ peko = SlashCommandGroup("peko", "PekoriBotのコマンド群", guild_ids=GUILD_
 # 🏅 /peko rank
 # ============================================================
 @peko.command(name="rank", description="自分のランクを登録（例：ゴールド2 / gold2 / ase1）")
-@discord.option(
-    "rank_name",
-    description="ランク名を入力（例：ゴールド2 / gold2 / ダイヤモンド3 / ase1 など）",
-    required=True
-)
-async def rank(ctx, rank_name: str):
+async def rank(
+    ctx,
+    rank_name: Option(str, "ランク名を入力（例：ゴールド2 / gold2 / ダイヤモンド3 / ase1 など）")
+):
     await ctx.defer()
     user = ctx.author
     avatar_url = user.display_avatar.url
     username = user.display_name
     user_id = str(user.id)
+
+    if not rank_name:
+        await ctx.followup.send("⚠️ ランク名を入力してください。")
+        return
 
     # ---- 整形・変換 ----
     input_text = rank_name.strip().lower().replace("　", "").replace(" ", "")
@@ -255,16 +258,16 @@ async def team(ctx):
     powerB = sum(p[2] for p in teamB)
 
     embed = discord.Embed(title="チーム分け結果", color=main_color)
-    embed.add_field(name="🟥 アタッカー＿＿＿＿", value="\n".join([f"{p[0]} ({p[1]})" for p in teamA]) + f"\n戦力：{powerA}", inline=True)
+    embed.add_field(name="🟥 アタッカー", value="\n".join([f"{p[0]} ({p[1]})" for p in teamA]) + f"\n戦力：{powerA}", inline=True)
     embed.add_field(name="🟦 ディフェンダー", value="\n".join([f"{p[0]} ({p[1]})" for p in teamB]) + f"\n戦力：{powerB}", inline=True)
     embed.add_field(name="　", value=f"組み合わせ候補：{idx}/{total}", inline=False)
     await ctx.followup.send(embed=embed)
 
 
 # ============================================================
-# 🧪 /peko teamtest（VC不要のテスト用）
+# 🧪 /peko teamtest（固定10人）
 # ============================================================
-@peko.command(name="teamtest", description="VCに参加せず固定リストから10人をチーム分けします")
+@peko.command(name="teamtest", description="VC不要・固定10人でチーム分けテスト")
 async def teamtest(ctx):
     await ctx.defer()
 
@@ -302,22 +305,23 @@ async def teamtest(ctx):
     powerB = sum(p[2] for p in teamB)
 
     embed = discord.Embed(title="チーム分けテスト結果", color=main_color)
-    embed.add_field(name="🟥 アタッカー＿＿＿＿", value="\n".join([f"{p[0]} ({p[1]})" for p in teamA]) + f"\n戦力：{powerA}", inline=True)
+    embed.add_field(name="🟥 アタッカー", value="\n".join([f"{p[0]} ({p[1]})" for p in teamA]) + f"\n戦力：{powerA}", inline=True)
     embed.add_field(name="🟦 ディフェンダー", value="\n".join([f"{p[0]} ({p[1]})" for p in teamB]) + f"\n戦力：{powerB}", inline=True)
     embed.add_field(name="　", value=f"組み合わせ候補：{idx}/{total}", inline=False)
     await ctx.followup.send(embed=embed)
 
 
 # ============================================================
-# 🚀 起動処理
+# 🚀 起動時処理
 # ============================================================
 bot.add_application_command(peko)
 
 @bot.event
 async def on_ready():
+    await bot.sync_commands()
+    logging.info(f"✅ コマンド同期完了: {len(bot.application_commands)} 件")
     await bot.change_presence(activity=discord.Game(name="/peko rank / team / teamtest"))
     logging.info(f"✅ Logged in as {bot.user} (id: {bot.user.id})")
-
 
 if __name__ == "__main__":
     token = os.getenv("DISCORD_TOKEN", "").strip().strip('"').strip("'")
