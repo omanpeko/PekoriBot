@@ -217,6 +217,7 @@ async def remove(ctx):
 # ============================================================
 async def process_team_result(ctx, data):
     """共通: チーム分け計算 → Embed出力 → GASへ送信して画像表示"""
+    global CUSTOM_EMOJIS
     players = []
     for d in data:
         name = d.get("name", "不明")
